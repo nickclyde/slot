@@ -96,6 +96,9 @@ pub trait RetroCore: Send {
     fn net(&self) -> Link {
         Link::default()
     }
+    fn memory_map(&self) -> &[crate::memory::MemoryDescriptor] {
+        &[]
+    }
     fn start_link(&mut self, _client_id: u16) {}
     fn pump_link(&mut self) {}
     fn stop_link(&mut self) {}

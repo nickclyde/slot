@@ -1,0 +1,10 @@
+slot talks to RetroAchievements over HTTPS using these Rust crates, linked into the slot binary.
+
+ureq        MIT OR Apache-2.0              https://github.com/algesten/ureq
+rustls      Apache-2.0 OR ISC OR MIT       https://github.com/rustls/rustls
+ring        Apache-2.0 AND ISC             https://github.com/briansmith/ring
+webpki      ISC                            https://github.com/rustls/webpki
+webpki-roots CDLA-Permissive-2.0           https://github.com/rustls/webpki-roots
+
+webpki-roots carries Mozilla's root certificate list as data under the Community Data
+License Agreement, Permissive, Version 2.0: https://cdla.dev/permissive-2-0/

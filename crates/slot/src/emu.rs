@@ -502,6 +502,7 @@ impl Worker {
                 self.shared.resume_refused.store(true, Ordering::Release);
             }
         }
+        let _cheevos = crate::cheevos::loaded(&rom);
         let av = core.av_info();
         let device_hz = match ring.sample_rate() {
             0 => av.sample_rate,
@@ -544,6 +545,7 @@ impl Worker {
             for cmd in self.cmds.try_iter() {
                 self.apply(cmd, core.as_mut(), &mut transport, &mut cable, &link);
             }
+            crate::cheevos::idle(core.as_ref());
 
             if let Some(t) = transport.as_mut() {
                 match cable.as_mut() {
@@ -559,6 +561,7 @@ impl Worker {
                             } else {
                                 match core.unserialize(&state) {
                                     Ok(()) => {
+                                        crate::cheevos::reset();
                                         eprintln!(
                                         "slot: cable: restored {} bytes, running the host's game",
                                         state.len()
@@ -688,6 +691,7 @@ impl Worker {
                         }
                         None => core.run_frame(input),
                     }
+                    crate::cheevos::frame(core.as_ref());
                     let took = frame_began.elapsed();
                     if last {
                         drawn = took;
@@ -858,6 +862,7 @@ impl Worker {
                 if let Err(e) = core.unserialize(&self.for_core(state)) {
                     eprintln!("slot: {e}");
                 }
+                crate::cheevos::reset();
             }
             Cmd::Sav(reply) => {
                 let _ = reply.send(core.save_ram());

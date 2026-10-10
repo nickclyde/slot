@@ -25,6 +25,7 @@ enum PixelFormat {
 struct Host {
     video: Vec<u8>,
     format: PixelFormat,
+    memory_map: Vec<crate::memory::MemoryDescriptor>,
     audio: Vec<i16>,
     inputs: [u16; 2],
     system_dir: CString,
@@ -75,6 +76,9 @@ unsafe extern "C" fn set_rumble_state(port: c_uint, effect: c_uint, strength: u1
 
 unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
     match cmd {
+        crate::memory::SET_MEMORY_MAPS | crate::memory::SET_MEMORY_MAPS_PLAIN => {
+            with_host(|h| h.memory_map = crate::memory::descriptors(data)).is_some()
+        }
         GET_CAN_DUPE => {
             if data.is_null() {
                 return false;
@@ -471,6 +475,7 @@ impl LibretroCore {
         let mut host = Box::new(Host {
             video: vec![0; VIDEO_BYTES],
             format: PixelFormat::Xrgb8888,
+            memory_map: Vec::new(),
             audio: Vec::new(),
             inputs: [0; 2],
             system_dir: cdir(system_dir)?,
@@ -675,6 +680,10 @@ impl RetroCore for LibretroCore {
         self.host.net.clone()
     }
 
+    fn memory_map(&self) -> &[crate::memory::MemoryDescriptor] {
+        &self.host.memory_map
+    }
+
     fn start_link(&mut self, client_id: u16) {
         let _a = Active::bind(&mut self.host);
         unsafe { begin_link(client_id) };
@@ -702,6 +711,7 @@ mod tests {
         Box::new(Host {
             video: vec![0; VIDEO_BYTES],
             format: PixelFormat::Xrgb8888,
+            memory_map: Vec::new(),
             audio: Vec::new(),
             inputs: [0; 2],
             system_dir: CString::new(".").unwrap(),
