@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>slot. RetroAchievements</title>
+<meta name="description" content="Setting up RetroAchievements and Wi-Fi in slot.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="mast">
+  <a class="mast-mark" href="/">slot.</a>
+</header>
+
+<main>
+<section class="panel" id="retroachievements" aria-label="RetroAchievements">
+  <div class="wrap">
+    <h2>RetroAchievements</h2>
+    <p>slot can earn <a href="https://retroachievements.org">RetroAchievements</a> while you play. It needs two text
+       files in the <code>Config</code> folder on your SD card: one for your Wi-Fi and one for your account.</p>
+
+    <ol class="install-steps">
+      <li>
+        <h3>Tell slot about your Wi-Fi</h3>
+        <p>Create <code>Config/wifi.txt</code>:</p>
+<pre><code>ssid = My Home Network
+psk = my wifi password</code></pre>
+        <p>Leave out <code>psk</code> for an open network. If your network has no DHCP, add
+           <code>address = 192.168.1.50/24</code>, <code>gateway = 192.168.1.1</code> and <code>dns = 192.168.1.1</code>.
+           Add <code>ntp = on</code> to set the clock from the internet once connected.</p>
+      </li>
+      <li>
+        <h3>Add your account</h3>
+        <p>Create <code>Config/retroachievements.txt</code>:</p>
+<pre><code>username = YourName
+password = your password</code></pre>
+        <p>The first time slot signs in, it swaps the password in this file for a login token, so your password
+           does not stay on the card. If the token ever stops working, put a <code>password</code> line back in.</p>
+      </li>
+      <li>
+        <h3>Play</h3>
+        <p>slot signs in when it starts. Insert a cart and a banner shows the game and how many achievements you have.
+           Each unlock pops up at the bottom of the screen with its badge.</p>
+      </li>
+    </ol>
+
+    <aside class="admonition" role="note">
+      <p class="admonition-title">Softcore only</p>
+      <p>slot resumes from a save state every time you insert a cart, and lets you rewind and load Polaroids.
+         RetroAchievements hardcore mode forbids all of those, so slot always plays in softcore.</p>
+    </aside>
+
+    <h3>Good to know</h3>
+    <ul>
+      <li>Link play takes over the Wi-Fi. slot drops off your network while a link session runs and reconnects
+          afterwards. Unlocks earned in the meantime are sent once it is back online.</li>
+      <li>Unlocks earned offline are retried until the server confirms them.</li>
+      <li>Loading a Polaroid resets the progress of achievements that count over time, so a loaded state cannot
+          unlock anything by itself.</li>
+      <li>If sign-in fails with a certificate error, check the clock: secure connections need the right date.</li>
+      <li>Delete <code>Config/retroachievements.txt</code> to turn achievements off, and <code>Config/wifi.txt</code>
+          to keep the Wi-Fi off.</li>
+    </ul>
+  </div>
+</section>
+</main>
+
+</body>
+</html>
