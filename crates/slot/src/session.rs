@@ -7,6 +7,7 @@ use slot_store::Platform;
 use slot_ui::FfState;
 
 pub const RUMBLE_MIN_MS: Millis = 100;
+pub const RUMBLE_MAX_MS: Millis = 150;
 
 use crate::app::{App, Phase};
 use crate::audio::{opened_sink, AudioSink, Ring, Sfx};
@@ -15,6 +16,7 @@ use crate::emu::{CoreState, EmuHandle, Speed};
 use crate::frames::FrameRef;
 use crate::input::Pad;
 use crate::persist;
+use crate::prefetch::Prefetch;
 
 pub struct Session {
     root: PathBuf,
@@ -27,6 +29,7 @@ pub struct Session {
     fast: bool,
     motor: u16,
     pulse: Option<(Millis, u16)>,
+    prefetch: Prefetch,
     reloading: bool,
     driven: bool,
 }
@@ -48,6 +51,7 @@ impl Session {
             fast: false,
             motor: 0,
             pulse: None,
+            prefetch: Prefetch::default(),
             reloading: false,
             driven: false,
         }
@@ -78,6 +82,10 @@ impl Session {
         }
         self.motor = strength;
         self.app.set_rumble(strength);
+    }
+
+    pub fn prefetching(&self) -> Option<&std::path::Path> {
+        self.prefetch.reading()
     }
 
     pub fn core_rumble(&self) -> Option<&Rumble> {
@@ -256,13 +264,18 @@ impl Session {
                 self.act(action);
             }
         }
-        self.app
-            .set_game_ready(self.emu.as_ref().is_some_and(EmuHandle::has_published));
+        let ready = self.emu.as_ref().is_some_and(EmuHandle::has_published);
+        if ready && !self.app.game_ready() {
+            launch("first frame shown");
+        }
+        self.app.set_game_ready(ready);
         self.sync_speed();
         self.sync_rewind_hud();
         self.sync_ff_hud();
         self.sync_rumble();
         self.sync_pad();
+        let now = self.app.now();
+        self.prefetch.browse(self.app.browsed_rom(), now);
     }
 
     fn sync_rumble(&mut self) {
@@ -282,7 +295,11 @@ impl Session {
             }
             (asked, Some((at, _))) => {
                 self.pulse = Some((at, asked));
-                asked
+                if now.saturating_sub(at) < RUMBLE_MAX_MS {
+                    asked
+                } else {
+                    0
+                }
             }
             (asked, None) => {
                 self.pulse = Some((now, asked));
@@ -419,6 +436,7 @@ impl Session {
             return;
         };
         let core = slot_store::core_for_platform(&self.root, stem, platform);
+        launch(&format!("opening {stem} on {}", core.as_str()));
         self.app.set_core(core);
         self.app.set_platform(platform);
         self.app
@@ -427,6 +445,7 @@ impl Session {
         let resume = (!self.app.starting_clean())
             .then(|| persist::read_resume(&self.root, platform, core, stem))
             .flatten();
+        launch("resume state read");
         let player = self.app.link_player();
         let palette = crate::core::palette_for(self.app.gb_palette(), platform, &rom, player);
         self.app.set_palette_live(palette.is_some());
@@ -439,7 +458,9 @@ impl Session {
             player,
         );
         self.app.set_named_core(opened.named);
+        launch("core opened");
         let sav = persist::read_sav(&self.root, platform, stem);
+        launch("save read");
         let ring = self.sink.ring();
         let emu = match player.filter(|_| platform == Platform::Gba) {
             Some(p) => EmuHandle::spawn_linked(opened.core, rom, ring, sav, resume, p),
@@ -486,4 +507,8 @@ impl Session {
 pub(crate) fn trace() -> bool {
     static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *ON.get_or_init(|| std::env::var_os("SLOT_TRACE").is_some())
+}
+
+fn launch(step: &str) {
+    eprintln!("slot: launch: {step} at {:.1} ms", crate::boot_time::ms());
 }
