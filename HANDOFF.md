@@ -1,12 +1,12 @@
 # Handoff: RetroAchievements fork
 
 Notes for whoever picks this fork up next. `FORK.md` lists every hook in upstream files and how to sync;
-this file covers status, decisions and what is still open. Last updated 2026-10-09.
+this file covers status, decisions and what is still open. Last updated 2026-10-11.
 
 ## Status
 
 - RetroAchievements (softcore) and the Wi-Fi client are implemented, tested and committed on `main` of
-  `nickclyde/slot`, based on upstream `511f0e0` ("Add 34XX and 34XXSP").
+  `nickclyde/slot`, based on upstream `9d7c795` (v1.6.0, "docs: changelog for 1.6.0").
 - Confirmed on a real RG SP: sign-in worked for user `clydedroid`, and inserting Metroid - Zero Mission showed
   the game-loaded banner with 2 achievements. Not yet checked from `slot.log` whether Wi-Fi came up through
   `slotnet.sh` or BaseOS was already online.
@@ -65,6 +65,9 @@ this file covers status, decisions and what is still open. Last updated 2026-10-
 - **`SET_MEMORY_MAPS` is `36 | 0x10000`** (the experimental flag). Both values are accepted.
 - **`a_stalled_display_does_not_stall_the_worker`** in `crates/slot/tests/emu.rs` is timing sensitive. It fails
   on untouched upstream too when the Mac is busy; rerun it on a quiet machine before suspecting a change.
+- **Upstream v1.6.0 fails `task check` on its own.** `crates/slot/tests/prefetch.rs` is not rustfmt-clean
+  and has an unused `let mut step`, so `fmt:check` and `lint` fail. Leave it for upstream to fix rather than
+  editing the file and creating merge conflicts; run `lint:device`, `test` and `test:card` on their own.
 - **Do not share `target/` between this checkout and a worktree of upstream.** Cargo names workspace crate
   artifacts relative to the workspace root, so one build overwrites the other's and stale artifacts look
   fresh. `cargo clean -p <crate>` for each workspace crate fixes it.
