@@ -1,5 +1,8 @@
 # Fork notes
 
+This is slot-plus, published at github.com/nickclyde/slot-plus. It was renamed from `nickclyde/slot` on
+2026-10-13 and GitHub redirects the old URL. The app itself is still called slot.
+
 This fork adds RetroAchievements (softcore), a home Wi-Fi client, and shelves and search for large libraries
 to slot. It is kept as a small set of new files plus one-line hooks in upstream files, so syncing with
 `origin` stays easy.

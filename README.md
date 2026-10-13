@@ -14,20 +14,24 @@
 
 # About this fork
 
-This is [nickclyde/slot](https://github.com/nickclyde/slot), a fork of
+This is [slot-plus](https://github.com/nickclyde/slot-plus), an unofficial fork of
 [BrandonKowalski/slot](https://github.com/BrandonKowalski/slot) that adds
-**[RetroAchievements](https://retroachievements.org)** and a home **Wi-Fi** client.
-Everything else is upstream slot, and the fork is kept in sync with it.
+**[RetroAchievements](https://retroachievements.org)**, a home **Wi-Fi** client, and shelves and search for
+big libraries. Everything else is upstream slot, and the fork is kept in sync with it. Please report bugs in
+these additions here rather than to slot.
 
 What it adds:
 
 - Sign in to RetroAchievements from a text file on the card. After the first sign-in slot swaps your
   password for a login token.
 - Insert a cart and slot identifies the game and shows how many achievements you have.
-- Every unlock pops up at the bottom of the screen with its badge. Unlocks earned offline are sent once
+- Every unlock pops up in the top left of the screen with its badge. Unlocks earned offline are sent once
   you are back online.
 - Softcore only, so resume-on-insert, rewind and Polaroids keep working as usual.
 - Joins your home network from `Config/wifi.txt`, and steps aside while link play uses the radio.
+- Recently Played and Favorites shelves before the platforms on L1/R1. Y adds or removes a favorite.
+- Your own shelves: each `.txt` file in `Config/Lists/` is a shelf, one game per line.
+- X searches every platform from an on-screen keyboard and puts the matches on a shelf of their own.
 
 ## Using the fork
 
@@ -35,8 +39,8 @@ There are no prebuilt releases of the fork yet, so build the card from source on
 [Task](https://taskfile.dev) and Docker installed:
 
 ```sh
-git clone https://github.com/nickclyde/slot.git
-cd slot
+git clone https://github.com/nickclyde/slot-plus.git
+cd slot-plus
 task dist:device
 ```
 

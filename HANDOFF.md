@@ -6,7 +6,7 @@ this file covers status, decisions and what is still open. Last updated 2026-10-
 ## Status
 
 - RetroAchievements (softcore) and the Wi-Fi client are implemented, tested and committed on `main` of
-  `nickclyde/slot`, based on upstream `4a4ba92` (v1.6.0 plus run-ahead, "Add a 1 frame run-ahead setting
+  `nickclyde/slot-plus`, based on upstream `4a4ba92` (v1.6.0 plus run-ahead, "Add a 1 frame run-ahead setting
   for GBA games on mGBA").
 - Confirmed on a real RG SP: sign-in worked for user `clydedroid`, and inserting Metroid - Zero Mission showed
   the game-loaded banner with 2 achievements. Not yet checked from `slot.log` whether Wi-Fi came up through
