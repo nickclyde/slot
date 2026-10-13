@@ -227,7 +227,7 @@
   <ol class="guide-steps">
       <li class="step" id="browse" data-clip="carousel.mp4">
         <h3>Browse the Carousel</h3>
-        <p><kbd>Left</kbd> and <kbd>Right</kbd> to flip through games on the shelf.<br><kbd>L1</kbd> and <kbd>R1</kbd> to switch platforms.</p>
+        <p><kbd>Left</kbd> and <kbd>Right</kbd> to flip through games on the shelf.<br><kbd>L1</kbd> and <kbd>R1</kbd> to switch shelves: Recently Played, Favorites, your lists and each platform.</p>
       </li>
       <li class="step" id="core-picker" data-clip="core-picker.mp4">
         <h3>Pick an Emulator</h3>
@@ -338,7 +338,15 @@
         </div>
         <div class="key">
           <dt><kbd>L1</kbd> / <kbd>R1</kbd></dt>
-          <dd>Switch between platforms</dd>
+          <dd>Switch shelves: Recently Played, Favorites, your lists, platforms</dd>
+        </div>
+        <div class="key">
+          <dt><kbd>Y</kbd></dt>
+          <dd>Add or remove a favorite</dd>
+        </div>
+        <div class="key">
+          <dt><kbd>X</kbd></dt>
+          <dd>Search. <kbd>START</kbd> shows the matches on their own shelf, <kbd>B</kbd> clears it</dd>
         </div>
         <div class="key">
           <dt>Tap <kbd>A</kbd></dt>
@@ -527,6 +535,14 @@
               <li>gb_bios.bin</li>
             </ul>
           </dd>
+        </div>
+        <div class="qa">
+          <dt>Can I make my own shelves?</dt>
+          <dd>Yes. Each <code>.txt</code> file in <code>Config/Lists/</code> becomes a shelf named after
+              the file, with one game per line in the order you want them. Write a game as its ROM
+              name, with or without the platform folder and extension, for example
+              <code>GBA/Metroid Fusion</code> or <code>Metroid Fusion.gba</code>. Lines starting with
+              <code>#</code> are ignored. slot reads the lists when it starts.</dd>
         </div>
         <div class="qa">
           <dt>Where do the games come from?</dt>

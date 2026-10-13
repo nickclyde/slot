@@ -30,6 +30,9 @@ use crate::link_start::{link_port, LinkFail, LinkProgress, LinkStarter, LinkStep
 use crate::persist::{self, Snapshot};
 use crate::video_mode::{self, VideoMode};
 
+pub mod shelves;
+use shelves::ShelfKind;
+
 pub const INSERT_S: f32 = 0.73;
 const INSERT_HOLD_S: f32 = 0.28;
 
@@ -261,8 +264,9 @@ pub enum Phase {
 
 pub struct App {
     phase: Phase,
-    shelves: Vec<(Platform, Shelf)>,
+    shelves: Vec<(ShelfKind, Shelf)>,
     shelf_at: usize,
+    collections: shelves::Collections,
     play_held: Option<Millis>,
     refusal: Option<Refusal>,
     refused_from: Option<f32>,
@@ -360,7 +364,7 @@ pub struct FaceWant {
     pub on_screen: bool,
 }
 
-fn shelves_of(carts: Vec<Cart>) -> Vec<(Platform, Shelf)> {
+fn shelves_of(carts: Vec<Cart>) -> Vec<(ShelfKind, Shelf)> {
     let mut rows: Vec<(Platform, Vec<Cart>)> =
         Platform::ALL.iter().map(|p| (*p, Vec::new())).collect();
     for cart in carts {
@@ -369,7 +373,7 @@ fn shelves_of(carts: Vec<Cart>) -> Vec<(Platform, Shelf)> {
         }
     }
     rows.into_iter()
-        .map(|(platform, carts)| (platform, Shelf::new(carts)))
+        .map(|(platform, carts)| (platform.into(), Shelf::new(carts)))
         .collect()
 }
 
@@ -388,6 +392,7 @@ impl App {
             phase: Phase::Shelf,
             shelves,
             shelf_at,
+            collections: Default::default(),
             play_held: None,
             refusal: None,
             refused_from: None,
@@ -482,6 +487,7 @@ impl App {
         crate::boot_time::mark("scan");
         let mut app = App::new(carts);
         app.root = Some(root.to_path_buf());
+        shelves::stock(&mut app, root);
         app.state = read_slot_state(root);
         if app.state.clock_set {
             app.start();
@@ -586,7 +592,10 @@ impl App {
         self.shelves
             .iter()
             .enumerate()
-            .filter(|(_, (p, _))| platform.is_none_or(|want| *p == want))
+            .filter(|(_, (kind, _))| {
+                kind.platform()
+                    .is_some_and(|p| platform.is_none_or(|want| p == want))
+            })
             .find_map(|(at, (_, shelf))| {
                 shelf
                     .carts
@@ -711,13 +720,16 @@ impl App {
     }
 
     pub fn slot_text(&self) -> Option<String> {
+        if let Some(note) = shelves::shown_note(self) {
+            return Some(note.to_string());
+        }
         match self.slot_letter {
             Some(letter) => Some(letter.to_string()),
             None => self.shelf_platform_name().map(str::to_string),
         }
     }
 
-    pub fn shelf_platform_name(&self) -> Option<&'static str> {
+    pub fn shelf_platform_name(&self) -> Option<&str> {
         self.next_shelf(1)?;
         Some(self.shelves[self.shelf_at].0.name())
     }
@@ -737,6 +749,7 @@ impl App {
     pub fn carts(&self) -> impl Iterator<Item = &Cart> {
         self.shelves
             .iter()
+            .filter(|(kind, _)| kind.platform().is_some())
             .flat_map(|(_, shelf)| shelf.carts.iter())
     }
 
@@ -749,7 +762,7 @@ impl App {
             Phase::Doze { cart: Some(cart) } => cart,
             _ => return None,
         };
-        self.shelf().carts.iter().find(|c| c.stem == *stem)
+        self.shelf().find(stem).map(|(cart, _)| cart)
     }
 
     pub fn single_cart(&self) -> bool {
@@ -798,7 +811,7 @@ impl App {
 
     pub fn shed_faces(&mut self) -> Vec<TexId> {
         let neighbours = self.neighbour_shelves();
-        let mut shed = Vec::new();
+        let mut shed = shelves::take_shed(self);
         for (at, (_, shelf)) in self.shelves.iter_mut().enumerate() {
             let keep = if at == self.shelf_at {
                 shelf.around(FACE_KEEP)
@@ -1254,6 +1267,9 @@ impl App {
         }
         if self.game_menu.is_some() {
             return self.game_menu_input(action);
+        }
+        if shelves::input(self, action) {
+            return;
         }
         let now = self.now();
         match self.phase {
@@ -1851,6 +1867,7 @@ impl App {
     }
 
     fn record_cart(&mut self, cart: Option<String>) {
+        shelves::recorded(self, cart.as_deref());
         let platform = self.seated_cart().map(|c| c.platform);
         if self.state.cart == cart && self.state.cart_platform == platform {
             return;
@@ -2086,6 +2103,7 @@ impl App {
         if let Some(menu) = self.game_menu {
             self.draw_game_menu(menu, out);
         }
+        shelves::draw(self, out);
         self.hud.draw(self.now(), out);
     }
 

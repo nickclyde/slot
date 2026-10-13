@@ -1,7 +1,8 @@
 # Fork notes
 
-This fork adds RetroAchievements (softcore) and a home Wi-Fi client to slot. It is kept as a small set of
-new files plus one-line hooks in upstream files, so syncing with `origin` stays easy.
+This fork adds RetroAchievements (softcore), a home Wi-Fi client, and shelves and search for large libraries
+to slot. It is kept as a small set of new files plus one-line hooks in upstream files, so syncing with
+`origin` stays easy.
 
 ## Changes in this fork
 
@@ -9,6 +10,11 @@ new files plus one-line hooks in upstream files, so syncing with `origin` stays 
   cart, and show a banner with the badge for every unlock. Softcore only. Banners sit in the top left and
   wait out the BIOS intro on a game's first boot.
 - Join a home Wi-Fi network from `Config/wifi.txt`, yielding the radio to link play while it runs.
+- Recently Played and Favorites shelves sit before the platforms on L1/R1, and the carousel opens on Recently
+  Played. Y adds or removes a favorite.
+- Each `.txt` file in `Config/Lists/` is a shelf of its own, one game per line.
+- X searches every platform from an on-screen keyboard. START puts the matches on a shelf of their own and B
+  clears it.
 
 Setup for players is in `site/retroachievements.html`. Status, decisions and open work for whoever
 picks this up next are in `HANDOFF.md`.
@@ -25,6 +31,9 @@ picks this up next are in `HANDOFF.md`.
 | `card/System/slotnet.sh`, `card/test-slotnet.sh` | Wi-Fi up/down script and its tests |
 | `licenses/rcheevos-MIT.txt`, `licenses/retroachievements-tls.txt` | notices shipped in `System/licenses` |
 | `taskfile.fork.yml`, `tools/slotpress.c` | dev-only tasks for a device on adb: screenshots and button presses |
+| `crates/slot-store/src/collections.rs`, `find.rs` | recent, favorite and list files, and search matching |
+| `crates/slot/src/app/shelves.rs`, `shelves/` | collection shelves, favoriting, recents, the search overlay, the list writer thread |
+| `crates/slot-ui/src/keyboard.rs`, `src/shelf/restock.rs` | the search keyboard, and refilling a shelf without losing its faces |
 
 ## Hooks in upstream files
 
@@ -45,8 +54,29 @@ picks this up next are in `HANDOFF.md`.
 | `crates/slot-retro/src/core.rs` | default `fn memory_map` on `RetroCore` |
 | `crates/slot-retro/src/libretro.rs` | `memory_map` field on `Host`, the `SET_MEMORY_MAPS` arm, `fn memory_map` for `LibretroCore` |
 
-Building without the feature gives exactly upstream's behaviour:
-`cargo test -p slot --no-default-features --features host`.
+Building without the feature gives upstream's behaviour for RetroAchievements and Wi-Fi:
+`cargo test -p slot --no-default-features --features host`. The shelves below are not behind a feature.
+
+### Shelves and search
+
+`crates/slot/tests/collections_hooks.rs` fails if a merge drops any of these.
+
+| File | Hook |
+|---|---|
+| `crates/slot/src/app.rs` | `pub mod shelves;` and a `collections` field on `App` |
+| `crates/slot/src/app.rs` | `Vec<(ShelfKind, Shelf)>` in place of `Vec<(Platform, Shelf)>`, and `.into()` in `shelves_of` |
+| `crates/slot/src/app.rs` | `shelves::stock(&mut app, root);` in `boot` |
+| `crates/slot/src/app.rs` | `if shelves::input(self, action) { return; }` in `apply`, before the phase match |
+| `crates/slot/src/app.rs` | `shelves::recorded(self, cart.as_deref());` first in `record_cart` |
+| `crates/slot/src/app.rs` | `shelves::draw(self, out);` before the HUD in `draw` |
+| `crates/slot/src/app.rs` | `shelves::shown_note(self)` first in `slot_text` |
+| `crates/slot/src/app.rs` | `shelves::take_shed(self)` starts `shed_faces` |
+| `crates/slot/src/app.rs` | `seat_of` and `carts()` only look at platform shelves; `seated_cart` goes through `Shelf::find`; `shelf_platform_name` returns `Option<&str>` |
+| `crates/slot/src/frontend.rs` | `crate::app::shelves::sync_faces(...)` after the cart face sync in `compose` |
+| `crates/slot/src/cart_faces.rs` | `pending` remembers each job's rom, and `place` drops a face whose cart has moved |
+| `crates/slot-ui/src/shelf.rs` | `mod restock;`, a `pitch` field so mixed rows space evenly, and `find` trying the selected cart first |
+| `crates/slot-ui/src/lib.rs` | `mod keyboard;` and its `pub use` |
+| `crates/slot-store/src/lib.rs` | `pub mod collections;` and `pub mod find;` |
 
 ## Driving a device over adb
 

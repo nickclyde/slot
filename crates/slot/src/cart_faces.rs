@@ -1,4 +1,4 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Condvar, Mutex};
@@ -26,7 +26,7 @@ type Shared = Arc<(Mutex<Queue>, Condvar)>;
 pub struct CartFaces {
     queue: Shared,
     built: Receiver<(Key, CartFace)>,
-    pending: HashSet<Key>,
+    pending: HashMap<Key, PathBuf>,
     asked: Vec<FaceWant>,
     free: Vec<TexId>,
 }
@@ -47,7 +47,7 @@ impl CartFaces {
         CartFaces {
             queue,
             built,
-            pending: HashSet::new(),
+            pending: HashMap::new(),
             asked: Vec::new(),
             free: Vec::new(),
         }
@@ -86,20 +86,23 @@ impl CartFaces {
         }
         for w in wants {
             let key = (w.shelf, w.index);
-            if self.pending.contains(&key) {
+            if self.pending.contains_key(&key) {
                 continue;
             }
             if let Some(cart) = app.face_cart(w.shelf, w.index) {
                 queue.jobs.push_back((key, cart.clone()));
-                self.pending.insert(key);
+                self.pending.insert(key, cart.rom.clone());
             }
         }
         wake.notify_all();
     }
 
     fn place(&mut self, app: &mut App, compositor: &mut Compositor, key: Key, face: CartFace) {
-        self.pending.remove(&key);
+        let asked_for = self.pending.remove(&key);
         self.asked.retain(|w| (w.shelf, w.index) != key);
+        if asked_for.is_some_and(|rom| app.face_cart(key.0, key.1).map(|c| &c.rom) != Some(&rom)) {
+            return;
+        }
         let tex = match self.free.pop() {
             Some(tex) => {
                 compositor.update_texture(tex, face.w, face.h, &face.rgba);

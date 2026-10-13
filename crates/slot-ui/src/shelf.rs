@@ -7,6 +7,8 @@ use crate::hud::Millis;
 use crate::silhouette::GbShell;
 use crate::slot_chrome::{draw_empty_slot, MOUTH_H};
 
+mod restock;
+
 const SIDE_SCALE: f32 = 0.78;
 const SIDE_ALPHA: f32 = 0.55;
 
@@ -56,11 +58,13 @@ pub struct Shelf {
     ride: f32,
     vel: f32,
     held: Option<(i32, Millis, usize)>,
+    pitch: Option<f32>,
 }
 
 impl Shelf {
     pub fn new(carts: Vec<Cart>) -> Self {
         Shelf {
+            pitch: restock::pitch_of(&carts),
             shells: carts.iter().map(gb_shell_of).collect(),
             faces: vec![None; carts.len()],
             carts,
@@ -131,7 +135,9 @@ impl Shelf {
     }
 
     pub fn find(&self, stem: &str) -> Option<(&Cart, Option<TexId>)> {
-        let i = self.carts.iter().position(|c| c.stem == stem)?;
+        let i = Some(self.index)
+            .filter(|i| self.carts.get(*i).is_some_and(|c| c.stem == stem))
+            .or_else(|| self.carts.iter().position(|c| c.stem == stem))?;
         Some((&self.carts[i], self.face(i)))
     }
 
@@ -287,7 +293,10 @@ impl Shelf {
             .map_or(CART_W, |c| cart_box(c.platform).0) as f32;
         let offset = self.scroll_target() - self.scroll;
         let scale = shrink(offset);
-        (OUT_W as f32 / 2.0 + offset * w - w * scale / 2.0, scale)
+        (
+            OUT_W as f32 / 2.0 + offset * self.pitch.unwrap_or(w) - w * scale / 2.0,
+            scale,
+        )
     }
 
     pub fn update(&mut self, dt: f32) {
@@ -327,7 +336,8 @@ impl Shelf {
             let (cw, ch) = cart_box(cart.platform);
             let (w, h) = (cw as f32 * scale, ch as f32 * scale);
             let away = offset.signum() * (1.0 + offset.abs());
-            let x = OUT_W as f32 / 2.0 + offset * cw as f32 - w / 2.0 + away * PART * recede;
+            let pitch = self.pitch.unwrap_or(cw as f32);
+            let x = OUT_W as f32 / 2.0 + offset * pitch - w / 2.0 + away * PART * recede;
             if x + w <= 0.0 || x >= OUT_W as f32 || alpha <= 0.0 {
                 continue;
             }

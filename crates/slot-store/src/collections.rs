@@ -1,0 +1,222 @@
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+
+use crate::find::fold;
+use crate::platform::Platform;
+use crate::scan::{is_hidden, sort_key, Cart};
+
+pub const RECENT_FILE: &str = "Config/recent.txt";
+pub const FAVORITES_FILE: &str = "Config/favorites.txt";
+pub const LISTS_DIR: &str = "Config/Lists";
+pub const RECENT_MAX: usize = 30;
+
+pub type CartKey = (Platform, String);
+
+#[derive(Default)]
+pub struct Index {
+    exact: HashMap<(Platform, String), String>,
+    bare: HashMap<String, Vec<CartKey>>,
+    loose: HashMap<String, Vec<CartKey>>,
+}
+
+impl Index {
+    pub fn new<'a>(carts: impl IntoIterator<Item = &'a Cart>) -> Self {
+        let mut index = Index::default();
+        for cart in carts {
+            let key = (cart.platform, cart.stem.clone());
+            let lower = cart.stem.to_lowercase();
+            index
+                .exact
+                .entry((cart.platform, lower.clone()))
+                .or_insert_with(|| cart.stem.clone());
+            index.bare.entry(lower).or_default().push(key.clone());
+            index.loose.entry(loose(&cart.stem)).or_default().push(key);
+        }
+        for keys in index.bare.values_mut().chain(index.loose.values_mut()) {
+            keys.sort_by_key(|(p, _)| *p as u8);
+            keys.dedup();
+        }
+        index
+    }
+
+    pub fn resolve(&self, line: &str) -> Option<CartKey> {
+        let line = line.trim().trim_start_matches('\u{feff}').trim();
+        if line.is_empty() || line.starts_with('#') {
+            return None;
+        }
+        let line = line.replace('\\', "/");
+        let parts: Vec<&str> = line.split('/').filter(|p| !p.is_empty()).collect();
+        let (&name, before) = parts.split_last()?;
+        let platform = before.last().and_then(|dir| platform_of(dir));
+        let name = strip_rom_extension(name, platform);
+        let lower = name.to_lowercase();
+        if let Some(platform) = platform {
+            if let Some(stem) = self.exact.get(&(platform, lower.clone())) {
+                return Some((platform, stem.clone()));
+            }
+        } else if let Some(first) = self.bare.get(&lower).and_then(|keys| keys.first()) {
+            return Some(first.clone());
+        }
+        let mut near = self
+            .loose
+            .get(&loose(name))?
+            .iter()
+            .filter(|(p, _)| platform.is_none_or(|want| *p == want));
+        match (near.next(), near.next()) {
+            (Some(only), None) => Some(only.clone()),
+            _ => None,
+        }
+    }
+}
+
+fn platform_of(dir: &str) -> Option<Platform> {
+    Platform::ALL
+        .into_iter()
+        .find(|p| p.dir_name().eq_ignore_ascii_case(dir))
+}
+
+fn strip_rom_extension(name: &str, platform: Option<Platform>) -> &str {
+    let Some((stem, ext)) = name.rsplit_once('.') else {
+        return name;
+    };
+    let known = |p: Platform| p.extensions().iter().any(|k| k.eq_ignore_ascii_case(ext));
+    let rom = match platform {
+        Some(p) => known(p),
+        None => Platform::ALL.into_iter().any(known),
+    };
+    if rom && !stem.is_empty() {
+        stem
+    } else {
+        name
+    }
+}
+
+fn loose(name: &str) -> String {
+    fold(name).joined
+}
+
+pub fn canonical(platform: Platform, stem: &str) -> String {
+    format!("{}/{stem}", platform.dir_name())
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Entry {
+    pub raw: String,
+    pub hit: Option<CartKey>,
+}
+
+impl Entry {
+    fn of(key: CartKey) -> Self {
+        Entry {
+            raw: canonical(key.0, &key.1),
+            hit: Some(key),
+        }
+    }
+}
+
+pub fn parse_entries(text: &str, index: &Index) -> Vec<Entry> {
+    text.lines()
+        .map(|line| line.trim().trim_start_matches('\u{feff}').trim())
+        .filter(|line| !line.is_empty())
+        .map(|line| Entry {
+            raw: line.to_string(),
+            hit: index.resolve(line),
+        })
+        .collect()
+}
+
+pub fn read_entries(path: &Path, index: &Index) -> Vec<Entry> {
+    match std::fs::read_to_string(path) {
+        Ok(text) => parse_entries(&text, index),
+        Err(_) => Vec::new(),
+    }
+}
+
+pub fn render(entries: &[Entry]) -> String {
+    entries
+        .iter()
+        .map(|e| match &e.hit {
+            Some((platform, stem)) => canonical(*platform, stem),
+            None => e.raw.clone(),
+        })
+        .map(|line| line + "\n")
+        .collect()
+}
+
+pub fn hits(entries: &[Entry]) -> Vec<CartKey> {
+    let mut out: Vec<CartKey> = Vec::new();
+    for key in entries.iter().filter_map(|e| e.hit.as_ref()) {
+        if !out.contains(key) {
+            out.push(key.clone());
+        }
+    }
+    out
+}
+
+pub fn played(entries: &mut Vec<Entry>, platform: Platform, stem: &str) -> bool {
+    let key = (platform, stem.to_string());
+    let mut next = vec![Entry::of(key.clone())];
+    next.extend(
+        entries
+            .iter()
+            .filter(|e| e.hit.as_ref() != Some(&key))
+            .cloned(),
+    );
+    next.truncate(RECENT_MAX);
+    let changed = render(&next) != render(entries);
+    *entries = next;
+    changed
+}
+
+pub fn toggle(entries: &mut Vec<Entry>, platform: Platform, stem: &str) -> bool {
+    let key = (platform, stem.to_string());
+    let before = entries.len();
+    entries.retain(|e| e.hit.as_ref() != Some(&key));
+    if entries.len() != before {
+        return false;
+    }
+    entries.push(Entry::of(key));
+    true
+}
+
+pub fn is_listed(entries: &[Entry], platform: Platform, stem: &str) -> bool {
+    entries.iter().any(|e| {
+        e.hit
+            .as_ref()
+            .is_some_and(|(p, s)| *p == platform && s == stem)
+    })
+}
+
+pub struct List {
+    pub name: String,
+    pub carts: Vec<CartKey>,
+}
+
+pub fn read_lists(root: &Path, index: &Index) -> Vec<List> {
+    let Ok(dir) = std::fs::read_dir(root.join(LISTS_DIR)) else {
+        return Vec::new();
+    };
+    let mut files: Vec<PathBuf> = dir
+        .filter_map(|e| Some(e.ok()?.path()))
+        .filter(|p| !is_hidden(p) && p.is_file())
+        .filter(|p| {
+            p.extension()
+                .and_then(|e| e.to_str())
+                .is_some_and(|e| e.eq_ignore_ascii_case("txt"))
+        })
+        .collect();
+    files.sort_by_key(|p| sort_key(&file_stem(p)));
+    files
+        .into_iter()
+        .map(|path| List {
+            name: file_stem(&path),
+            carts: hits(&read_entries(&path, index)),
+        })
+        .collect()
+}
+
+fn file_stem(path: &Path) -> String {
+    path.file_stem()
+        .map(|s| s.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}

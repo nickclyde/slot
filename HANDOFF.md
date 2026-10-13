@@ -107,6 +107,31 @@ itself, or the shell will keep an old partition size.
 Moving a save from RetroArch: copy the `.srm` to `Saves/GBA/<ROM name>.sav`. It is the same raw save memory.
 Save states from other frontends do not carry over.
 
+## Shelves and search
+
+Added 2026-10-13 for libraries of 1000+ carts. Code and hooks are listed in `FORK.md`.
+
+- **Ring order** is `[Search, Recently Played, Favorites, lists A to Z, GBA, GB, GBC]`, all built once at boot,
+  because `CartFaces` keys faces by `(shelf, index)`. Empty shelves are skipped by `next_shelf` like an
+  empty platform. The Search shelf is empty until a search is confirmed.
+- **Boot** lands on Recently Played when it has a cart, else on the platform shelf as before. A seated cart
+  still resumes on its platform shelf (`seat_of` ignores collections).
+- **Files**: `Config/recent.txt` (newest first, 30 max), `Config/favorites.txt` and `Config/Lists/*.txt`.
+  Lines are matched leniently (`GBA/Stem`, a bare stem, a rom file name, or a stem without its tags when only
+  one cart fits). Lines matching nothing are kept when slot rewrites a file. Lists are read-only and read at
+  boot. Writes go through a `slot-lists` thread.
+- **Recently Played does not reorder while you are on it**, so the cart you just ejected stays under the
+  slot. It catches up when you leave it.
+- **Search** matches folded stems: title prefix first, then word starts, then substrings of 3+ letters.
+  The keyboard swallows every button while open. Hold-to-repeat on the d-pad is not done.
+- **Not tested directly**: the `cart_faces.rs` stale-face guard has no test that forces the race.
+
+Still to check on the device:
+
+1. The keyboard is readable at real size, and the d-pad feels right without hold-to-repeat.
+2. A mixed GBA/GB shelf looks right on the RG35XXSP's 4:3 screen.
+3. With 1000+ carts, opening the keyboard and each keypress do not stutter.
+
 ## Ideas not done
 
 - Keep in-progress achievement progress across Polaroid loads and restarts by storing
@@ -115,3 +140,4 @@ Save states from other frontends do not carry over.
 - Prebuilt releases for the fork from a GitHub workflow (a new workflow file, so it never conflicts).
 - Register a client name with RetroAchievements; not needed for softcore.
 - Offer the memory-map capture in `slot-retro` upstream, which would shrink the fork's hooks.
+- Hold-to-repeat on the search keyboard, and editing lists on the device.

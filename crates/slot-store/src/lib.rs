@@ -1,7 +1,9 @@
 mod atomic;
 pub mod cart_shell;
+pub mod collections;
 mod config;
 mod core;
+pub mod find;
 pub mod gb;
 mod gb_palette;
 mod gba;
