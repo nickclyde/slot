@@ -69,8 +69,8 @@ this file covers status, decisions and what is still open. Last updated 2026-10-
 - **`a_stalled_display_does_not_stall_the_worker`** in `crates/slot/tests/emu.rs` is timing sensitive. It fails
   on untouched upstream too when the Mac is busy; rerun it on a quiet machine before suspecting a change.
 - **Upstream fails `task check` on its own (v1.6.0 through `4a4ba92`).** `crates/slot/tests/prefetch.rs` is
-  not rustfmt-clean and has an unused `let mut step`, so `fmt:check` and `lint` fail. Leave it for upstream to fix rather than
-  editing the file and creating merge conflicts; run `lint:device`, `test` and `test:card` on their own.
+  not rustfmt-clean and has an unused `let mut step`, so `fmt:check` and `lint` fail. Leave it for upstream to
+  fix rather than editing the file and creating merge conflicts; run `lint:device`, `test` and `test:card` on their own.
 - **Do not share `target/` between this checkout and a worktree of upstream.** Cargo names workspace crate
   artifacts relative to the workspace root, so one build overwrites the other's and stale artifacts look
   fresh. `cargo clean -p <crate>` for each workspace crate fixes it.
