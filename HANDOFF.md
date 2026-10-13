@@ -1,12 +1,13 @@
 # Handoff: RetroAchievements fork
 
 Notes for whoever picks this fork up next. `FORK.md` lists every hook in upstream files and how to sync;
-this file covers status, decisions and what is still open. Last updated 2026-10-11.
+this file covers status, decisions and what is still open. Last updated 2026-10-13.
 
 ## Status
 
 - RetroAchievements (softcore) and the Wi-Fi client are implemented, tested and committed on `main` of
-  `nickclyde/slot`, based on upstream `9d7c795` (v1.6.0, "docs: changelog for 1.6.0").
+  `nickclyde/slot`, based on upstream `4a4ba92` (v1.6.0 plus run-ahead, "Add a 1 frame run-ahead setting
+  for GBA games on mGBA").
 - Confirmed on a real RG SP: sign-in worked for user `clydedroid`, and inserting Metroid - Zero Mission showed
   the game-loaded banner with 2 achievements. Not yet checked from `slot.log` whether Wi-Fi came up through
   `slotnet.sh` or BaseOS was already online.
@@ -52,6 +53,8 @@ this file covers status, decisions and what is still open. Last updated 2026-10-
 - **Reset policy.** `rc_client_reset` runs after Polaroid loads, undo and the cable state restore, so a loaded
   state cannot trigger an unlock by itself. Rewind pops do not reset, so in-progress hit counts survive.
 - **`do_frame` on every sub-frame**, fast-forward included, because game memory advances each one.
+- **Run-ahead is invisible to achievements.** Upstream's run-ahead runs speculative frames and loads the
+  real state back before `crate::cheevos::frame` runs, so `do_frame` only ever sees real memory, once per frame.
 - **Vendored rcheevos, not a submodule.** A fresh clone builds with no network, and the release workflow
   (an upstream file) would need editing to fetch submodules.
 - **Changelog lives in `FORK.md`**, not `CHANGELOG.md`, whose top changes every upstream release.
@@ -65,8 +68,8 @@ this file covers status, decisions and what is still open. Last updated 2026-10-
 - **`SET_MEMORY_MAPS` is `36 | 0x10000`** (the experimental flag). Both values are accepted.
 - **`a_stalled_display_does_not_stall_the_worker`** in `crates/slot/tests/emu.rs` is timing sensitive. It fails
   on untouched upstream too when the Mac is busy; rerun it on a quiet machine before suspecting a change.
-- **Upstream v1.6.0 fails `task check` on its own.** `crates/slot/tests/prefetch.rs` is not rustfmt-clean
-  and has an unused `let mut step`, so `fmt:check` and `lint` fail. Leave it for upstream to fix rather than
+- **Upstream fails `task check` on its own (v1.6.0 through `4a4ba92`).** `crates/slot/tests/prefetch.rs` is
+  not rustfmt-clean and has an unused `let mut step`, so `fmt:check` and `lint` fail. Leave it for upstream to fix rather than
   editing the file and creating merge conflicts; run `lint:device`, `test` and `test:card` on their own.
 - **Do not share `target/` between this checkout and a worktree of upstream.** Cargo names workspace crate
   artifacts relative to the workspace root, so one build overwrites the other's and stale artifacts look
