@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use slot_cheevos::badge::BADGE;
 use slot_cheevos::Notice;
-use slot_ui::{text, HUD_INK, PLATE_H};
+use slot_ui::{text, HUD_INK};
 
 pub const FACE_W: u32 = 480;
 pub const FACE_H: u32 = 84;
@@ -51,7 +51,7 @@ impl Queue {
 }
 
 pub fn rect() -> (f32, f32, f32, f32) {
-    (MARGIN, PLATE_H + MARGIN, FACE_W as f32, FACE_H as f32)
+    (MARGIN, MARGIN, FACE_W as f32, FACE_H as f32)
 }
 
 pub fn alpha(shown_for: Duration) -> Option<f32> {

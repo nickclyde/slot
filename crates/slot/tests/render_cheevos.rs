@@ -125,6 +125,6 @@ fn the_signed_in_banner_draws_over_the_shelf() {
         dark > (FACE_W * FACE_H / 2) as usize,
         "no dark panel ({dark} px)"
     );
-    let above = ((y - 20) * OUT_W as usize + x) * 4;
+    let above = ((y / 2) * OUT_W as usize + x) * 4;
     assert_eq!(shown[above..above + 4], before[above..above + 4]);
 }
