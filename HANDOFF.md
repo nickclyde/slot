@@ -82,6 +82,10 @@ this file covers status, decisions and what is still open. Last updated 2026-10-
   fresh. `cargo clean -p <crate>` for each workspace crate fixes it.
 - **In POSIX `sh`, `VAR=x some_function` leaks `VAR`** past the call. The card tests scope overrides with
   `(export VAR=x; run ...)`.
+- **BaseOS's adbd is old.** It has no `exec-out` and reports no features. It also cuts short a command that
+  is the last one in an `adb shell` string (likely because busybox `sh -c` execs it); a `dd` from `/dev/fb0` came
+  back a few rows long. End device commands with something after them (`|| echo ...`), as
+  `taskfile.fork.yml` does.
 - BaseOS's DHCP client was not known at build time. `slotnet.sh` tries `udhcpc`, then `busybox udhcpc`, and
   exits 5 if neither exists; static `address`, `gateway` and `dns` in `wifi.txt` skip DHCP.
 

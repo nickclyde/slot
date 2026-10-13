@@ -1,4 +1,9 @@
 const HOOKS: &[(&str, &str, &str)] = &[
+    (
+        "taskfile.yml",
+        include_str!("../../../taskfile.yml"),
+        "taskfile: ./taskfile.fork.yml",
+    ),
     ("lib.rs", include_str!("../src/lib.rs"), "pub mod cheevos;"),
     (
         "frontend.rs",

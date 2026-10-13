@@ -24,6 +24,7 @@ picks this up next are in `HANDOFF.md`.
 | `crates/slot-retro/src/memory.rs` | captures the core's `SET_MEMORY_MAPS` descriptors |
 | `card/System/slotnet.sh`, `card/test-slotnet.sh` | Wi-Fi up/down script and its tests |
 | `licenses/rcheevos-MIT.txt`, `licenses/retroachievements-tls.txt` | notices shipped in `System/licenses` |
+| `taskfile.fork.yml`, `tools/slotpress.c` | dev-only tasks for a device on adb: screenshots and button presses |
 
 ## Hooks in upstream files
 
@@ -31,6 +32,7 @@ picks this up next are in `HANDOFF.md`.
 
 | File | Hook |
 |---|---|
+| `taskfile.yml` | `includes:` block that flattens in `taskfile.fork.yml` |
 | `crates/slot/Cargo.toml` | `cheevos` feature, on in `default` and `device`; optional `slot-cheevos` dependency |
 | `crates/slot/src/lib.rs` | `pub mod cheevos;` |
 | `crates/slot/src/frontend.rs` | `crate::cheevos::start(platform.root());` in `boot_with` |
@@ -45,6 +47,21 @@ picks this up next are in `HANDOFF.md`.
 
 Building without the feature gives exactly upstream's behaviour:
 `cargo test -p slot --no-default-features --features host`.
+
+## Driving a device over adb
+
+With the device on USB, these let you see and drive slot without touching it:
+
+```sh
+task screenshot:device                         # saves target-device/screenshot.png
+task press:device -- right right a             # taps
+task press:device -- left:600 menu+x wait:500 b   # a hold, a chord, a pause
+```
+
+`press:device` builds `tools/slotpress.c` in the device container and pushes it to `/tmp` on the device.
+It writes key events into the existing `/dev/input` nodes, which slot reads like real presses. Buttons:
+`a b x y l1 r1 l2 r2 start select menu up down left right power volup voldown`. Holding A on the shelf
+starts a game fresh, which later overwrites its resume state, so tap A unless that is the point.
 
 ## Syncing with upstream
 

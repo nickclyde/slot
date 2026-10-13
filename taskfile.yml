@@ -6,6 +6,11 @@ vars:
   MGBA_COMMIT: e31759b24e7a4e3899285ff720d7b573ac328ae7
   GPSP_COMMIT: 7b2dd37394e2822110cacef321e9bb291a305b77
 
+includes:
+  fork:
+    taskfile: ./taskfile.fork.yml
+    flatten: true
+
 tasks:
   default:
     desc: List available tasks

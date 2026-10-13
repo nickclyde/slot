@@ -1,0 +1,45 @@
+version: '3'
+
+tasks:
+  build:slotpress:
+    desc: Build slotpress, the dev-only button presser for a device on adb
+    status:
+      - test target-device/slotpress -nt tools/slotpress.c
+    cmds:
+      - mkdir -p target-device
+      - task: device:sh
+        vars:
+          CMD: gcc -O2 -Wall -static -o target-device/slotpress tools/slotpress.c
+      - file target-device/slotpress | grep -q aarch64
+
+  press:device:
+    desc: 'Press buttons on a device over adb, e.g. task press:device -- down a menu+x a:800 wait:500 b'
+    deps: [build:slotpress]
+    cmds:
+      - adb push target-device/slotpress /tmp/slotpress > /dev/null
+      - adb shell '/tmp/slotpress {{.CLI_ARGS}} || echo "slotpress failed"'
+
+  screenshot:device:
+    desc: Save what a device on adb is showing as a PNG, OUT defaults to target-device/screenshot.png
+    vars:
+      OUT: '{{.OUT | default "target-device/screenshot.png"}}'
+    cmds:
+      - |
+        set -eu
+        fb=/sys/class/graphics/fb0
+        mode="$(adb shell cat $fb/modes | head -n 1 | tr -d '\r')"
+        size="$(echo "$mode" | cut -d : -f 2)"
+        w="$(echo "$size" | cut -d x -f 1)"
+        h="$(echo "$size" | cut -d x -f 2 | sed 's/[^0-9].*//')"
+        pan="$(adb shell cat $fb/pan | tr -d '\r')"
+        stride="$(adb shell cat $fb/stride | tr -d '\r')"
+        raw="$(mktemp)"
+        trap 'rm -f "$raw"' EXIT
+        adb shell "mkdir -p /tmp/slotshot && dd if=/dev/fb0 of=/tmp/slotshot/frame.raw bs=$stride skip=${pan#*,} count=$h 2>/dev/null || echo 'could not read /dev/fb0'"
+        adb pull /tmp/slotshot/frame.raw "$raw" > /dev/null
+        adb shell "rm -f /tmp/slotshot/frame.raw; rmdir /tmp/slotshot"
+        test "$(wc -c < "$raw")" -eq "$((stride * h))"
+        mkdir -p "$(dirname '{{.OUT}}')"
+        ffmpeg -loglevel error -y -f rawvideo -pixel_format bgra -video_size "$((stride / 4))x$h" -i "$raw" \
+          -frames:v 1 -vf "crop=$w:$h:0:0" '{{.OUT}}'
+        echo "saved {{.OUT}}"
