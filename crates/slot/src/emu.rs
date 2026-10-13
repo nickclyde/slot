@@ -521,6 +521,7 @@ impl Worker {
                 self.shared.sav_refused.store(true, Ordering::Release);
             }
         }
+        let _cheevos = crate::cheevos::loaded(&rom, resume.is_some());
         if let Some(resume) = resume {
             eprintln!(
                 "slot: emu: resume state, {} bytes, at {:.1} ms",
@@ -532,7 +533,6 @@ impl Worker {
                 self.shared.resume_refused.store(true, Ordering::Release);
             }
         }
-        let _cheevos = crate::cheevos::loaded(&rom);
         let av = core.av_info();
         let device_hz = match ring.sample_rate() {
             0 => av.sample_rate,

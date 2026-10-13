@@ -51,12 +51,12 @@ fn fades_in_holds_and_fades_out() {
 }
 
 #[test]
-fn sits_at_the_bottom_clear_of_the_hud_plate() {
+fn sits_in_the_top_left_corner_clear_of_the_hud_plate() {
     let (x, y, w, h) = rect();
     assert_eq!((w, h), (FACE_W as f32, FACE_H as f32));
-    assert_eq!(x * 2.0 + w, 720.0);
-    assert!(y > 40.0);
-    assert!(y + h < 480.0);
+    assert!(x > 0.0 && x + w / 2.0 < 720.0 / 2.0, "{x}");
+    assert!(y > slot_ui::PLATE_H, "{y}");
+    assert!(y + h < 480.0 / 2.0, "{y}");
 }
 
 #[test]

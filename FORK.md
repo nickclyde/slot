@@ -6,7 +6,8 @@ new files plus one-line hooks in upstream files, so syncing with `origin` stays 
 ## Changes in this fork
 
 - Earn RetroAchievements while playing: sign in from `Config/retroachievements.txt`, identify the inserted
-  cart, and show a banner with the badge for every unlock. Softcore only.
+  cart, and show a banner with the badge for every unlock. Softcore only. Banners sit in the top left and
+  wait out the BIOS intro on a game's first boot.
 - Join a home Wi-Fi network from `Config/wifi.txt`, yielding the radio to link play while it runs.
 
 Setup for players is in `site/retroachievements.html`. Status, decisions and open work for whoever
@@ -34,7 +35,7 @@ picks this up next are in `HANDOFF.md`.
 | `crates/slot/src/lib.rs` | `pub mod cheevos;` |
 | `crates/slot/src/frontend.rs` | `crate::cheevos::start(platform.root());` in `boot_with` |
 | `crates/slot/src/frontend.rs` | `crate::cheevos::overlay(compositor, &mut self.draws);` in `compose` |
-| `crates/slot/src/emu.rs` | `let _cheevos = crate::cheevos::loaded(&rom);` after the resume state loads |
+| `crates/slot/src/emu.rs` | `let _cheevos = crate::cheevos::loaded(&rom, resume.is_some());` before the resume state loads |
 | `crates/slot/src/emu.rs` | `crate::cheevos::idle(core.as_ref());` after the command drain |
 | `crates/slot/src/emu.rs` | `crate::cheevos::frame(core.as_ref());` after every `retro_run` |
 | `crates/slot/src/emu.rs` | `crate::cheevos::reset();` after `Cmd::Load` and the cable state restore |

@@ -11,6 +11,7 @@ use slot_cheevos::{
 use slot_gfx::{Compositor, Draw, TexId};
 use slot_retro::RetroCore;
 
+use super::boot;
 use super::net;
 use super::overlay::{self, Face, Queue};
 
@@ -21,9 +22,11 @@ const IDLE_EVERY: Duration = Duration::from_secs(1);
 
 struct Live {
     cheevos: &'static Cheevos,
+    root: PathBuf,
     faces: Mutex<Queue>,
     tickets: AtomicU64,
     current: AtomicU64,
+    booting: AtomicU64,
     switch: Mutex<()>,
 }
 
@@ -32,6 +35,7 @@ static LIVE: OnceLock<Live> = OnceLock::new();
 struct Seated {
     ticket: u64,
     console: Arc<AtomicU32>,
+    boot_left: u32,
     last_frame: Option<Instant>,
     last_idle: Option<Instant>,
 }
@@ -60,9 +64,11 @@ pub fn start(root: &Path) {
     let cheevos = Cheevos::start(credentials.host.as_deref(), |ua| Box::new(Http::new(ua)));
     let live = Live {
         cheevos,
+        root: root.to_path_buf(),
         faces: Mutex::new(Queue::default()),
         tickets: AtomicU64::new(0),
         current: AtomicU64::new(0),
+        booting: AtomicU64::new(0),
         switch: Mutex::new(()),
     };
     if LIVE.set(live).is_err() {
@@ -153,6 +159,7 @@ impl Drop for Guard {
         let Some(ticket) = self.ticket else { return };
         SEATED.with_borrow_mut(|s| *s = None);
         if let Some(live) = LIVE.get() {
+            live.booted(ticket);
             let _switch = live.switch.lock().unwrap();
             if live.current.load(Ordering::Acquire) == ticket {
                 live.current.store(0, Ordering::Release);
@@ -163,7 +170,15 @@ impl Drop for Guard {
     }
 }
 
-pub fn loaded(rom: &Path) -> Guard {
+impl Live {
+    fn booted(&self, ticket: u64) {
+        let _ = self
+            .booting
+            .compare_exchange(ticket, 0, Ordering::AcqRel, Ordering::Acquire);
+    }
+}
+
+pub fn loaded(rom: &Path, resumed: bool) -> Guard {
     let Some(live) = LIVE.get() else {
         return Guard { ticket: None };
     };
@@ -172,11 +187,16 @@ pub fn loaded(rom: &Path) -> Guard {
         let _switch = live.switch.lock().unwrap();
         live.current.store(ticket, Ordering::Release);
     }
+    let boot_left = boot::frames(&live.root, rom, resumed);
+    if boot_left > 0 {
+        live.booting.store(ticket, Ordering::Release);
+    }
     let console = Arc::new(AtomicU32::new(0));
     SEATED.with_borrow_mut(|s| {
         *s = Some(Seated {
             ticket,
             console: console.clone(),
+            boot_left,
             last_frame: None,
             last_idle: None,
         })
@@ -226,6 +246,12 @@ pub fn frame(core: &dyn RetroCore) {
     let Some(live) = LIVE.get() else { return };
     SEATED.with_borrow_mut(|s| {
         let Some(seated) = s else { return };
+        if seated.boot_left > 0 {
+            seated.boot_left -= 1;
+            if seated.boot_left == 0 {
+                live.booted(seated.ticket);
+            }
+        }
         if ready(live, seated, core) {
             live.cheevos.do_frame();
             seated.last_frame = Some(Instant::now());
@@ -270,6 +296,9 @@ pub fn overlay(compositor: &mut Compositor, draws: &mut Vec<Draw>) {
             .and_then(|t| overlay::alpha(now.duration_since(t)));
         if alpha.is_none() {
             shown.since = None;
+            if live.booting.load(Ordering::Acquire) != 0 {
+                return;
+            }
             let Some(face) = live.faces.lock().unwrap().pop() else {
                 return;
             };

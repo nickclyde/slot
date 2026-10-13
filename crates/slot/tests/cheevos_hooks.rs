@@ -13,7 +13,7 @@ const HOOKS: &[(&str, &str, &str)] = &[
     (
         "emu.rs",
         include_str!("../src/emu.rs"),
-        "let _cheevos = crate::cheevos::loaded(&rom);",
+        "let _cheevos = crate::cheevos::loaded(&rom, resume.is_some());",
     ),
     (
         "emu.rs",

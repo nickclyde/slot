@@ -1,4 +1,6 @@
 #[cfg(feature = "cheevos")]
+pub mod boot;
+#[cfg(feature = "cheevos")]
 mod live;
 #[cfg(feature = "cheevos")]
 pub mod net;

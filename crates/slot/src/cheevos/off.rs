@@ -7,7 +7,7 @@ pub struct Guard;
 
 pub fn start(_root: &Path) {}
 
-pub fn loaded(_rom: &Path) -> Guard {
+pub fn loaded(_rom: &Path, _resumed: bool) -> Guard {
     Guard
 }
 

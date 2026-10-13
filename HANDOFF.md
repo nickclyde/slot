@@ -25,6 +25,8 @@ this file covers status, decisions and what is still open. Last updated 2026-10-
 8. Sleep and wake: Wi-Fi and achievements recover.
 9. Go offline mid-game, unlock, come back: Offline then Online banners, unlock reaches the site.
 10. Link play: `slot.log` shows `slot: wifi: yielding to link play`, then `slot: wifi: up`.
+11. First boot of a cart with `BIOS/gba_bios.bin` present (delete its state ring first): the game-loaded
+    banner appears top left only after the BIOS intro, and not too long after.
 
 ## How it fits together
 
@@ -52,6 +54,10 @@ this file covers status, decisions and what is still open. Last updated 2026-10-
   old thread's guard only unloads the game if its ticket is still current.
 - **Reset policy.** `rc_client_reset` runs after Polaroid loads, undo and the cable state restore, so a loaded
   state cannot trigger an unlock by itself. Rewind pops do not reset, so in-progress hit counts survive.
+- **Banners wait out the BIOS intro.** On a fresh boot (no resume state) with a boot ROM in `BIOS/`, the
+  overlay pops no new banner for `boot::FRAMES` (300) emulated frames, so the game-loaded banner never covers
+  the logo. Counting frames, not time, keeps menus and fast-forward honest. The length is a generous guess;
+  tune it on the device if the banner lands too late or still overlaps the intro.
 - **`do_frame` on every sub-frame**, fast-forward included, because game memory advances each one.
 - **Run-ahead is invisible to achievements.** Upstream's run-ahead runs speculative frames and loads the
   real state back before `crate::cheevos::frame` runs, so `do_frame` only ever sees real memory, once per frame.
