@@ -1,15 +1,22 @@
 pub mod app;
 pub mod audio;
+pub mod baseos;
 pub mod bezel;
 pub mod boot_time;
 pub mod bootlogo;
 pub mod build_info;
 pub mod cable;
+pub mod card_log;
 pub mod cart_faces;
 pub mod cheevos;
 pub mod core;
 pub mod core_picker;
+#[cfg(unix)]
 pub mod crash;
+#[cfg(not(unix))]
+pub mod crash {
+    pub fn install() {}
+}
 pub mod drc;
 pub mod emu;
 pub mod face_builder;
@@ -25,6 +32,7 @@ pub mod link_radio;
 pub mod link_screen;
 pub mod link_start;
 pub mod link_state;
+pub mod panel_turn;
 pub mod persist;
 pub mod prefetch;
 pub mod resample;

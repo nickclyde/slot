@@ -1,6 +1,4 @@
-use slot_store::collections::{
-    hits, parse_entries, played, read_lists, render, toggle, Index, LISTS_DIR, RECENT_MAX,
-};
+use slot_store::collections::{hits, parse_entries, read_lists, Index, LISTS_DIR};
 use slot_store::{Cart, Platform};
 use std::path::PathBuf;
 
@@ -92,48 +90,10 @@ fn comments_blank_lines_and_a_byte_order_mark_are_ignored() {
 }
 
 #[test]
-fn a_line_naming_no_cart_on_the_card_is_skipped_but_kept_when_favourites_are_written() {
+fn a_line_naming_no_cart_on_the_card_is_skipped() {
     let index = Index::new(&card());
-    let mut entries = parse_entries("# mine\nZelda\ngba/tetris\n", &index);
+    let entries = parse_entries("# mine\nZelda\ngba/tetris\n", &index);
     assert_eq!(hits(&entries), vec![(Platform::Gba, "Tetris".to_string())]);
-    assert!(toggle(&mut entries, Platform::Gbc, "Mr. Driller"));
-    assert_eq!(
-        render(&entries),
-        "# mine\nZelda\nGBA/Tetris\nGBC/Mr. Driller\n"
-    );
-}
-
-#[test]
-fn favouriting_twice_takes_the_favourite_back() {
-    let index = Index::new(&card());
-    let mut entries = parse_entries("GBA/Tetris\n", &index);
-    assert!(toggle(&mut entries, Platform::Gb, "Tetris"));
-    assert!(!toggle(&mut entries, Platform::Gba, "Tetris"));
-    assert_eq!(render(&entries), "GB/Tetris\n");
-}
-
-#[test]
-fn recently_played_puts_the_newest_first_and_forgets_past_the_cap() {
-    let carts: Vec<Cart> = (0..RECENT_MAX + 5)
-        .map(|i| cart(Platform::Gba, &format!("Game {i}")))
-        .collect();
-    let mut entries = Vec::new();
-    for c in &carts {
-        assert!(played(&mut entries, c.platform, &c.stem));
-    }
-    let order = hits(&entries);
-    assert_eq!(order.len(), RECENT_MAX);
-    assert_eq!(order[0].1, format!("Game {}", RECENT_MAX + 4));
-    assert_eq!(order[RECENT_MAX - 1].1, "Game 5");
-}
-
-#[test]
-fn playing_a_recent_game_again_moves_it_to_the_front_instead_of_listing_it_twice() {
-    let index = Index::new(&card());
-    let mut entries = parse_entries("GBA/Tetris\nGB/Tetris\nGBC/Mr. Driller\n", &index);
-    assert!(played(&mut entries, Platform::Gbc, "Mr. Driller"));
-    assert_eq!(render(&entries), "GBC/Mr. Driller\nGBA/Tetris\nGB/Tetris\n");
-    assert!(!played(&mut entries, Platform::Gbc, "Mr. Driller"));
 }
 
 #[test]

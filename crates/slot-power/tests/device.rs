@@ -56,15 +56,15 @@ fn the_backlight_steps_span_whatever_range_the_kernel_reports() {
     assert_eq!(brightness(&d), 255);
     p.set_backlight(5);
     let mid = brightness(&d);
-    assert!((40..=80).contains(&mid), "step 5 of 9 wrote {mid} of 255");
+    assert!((40..=90).contains(&mid), "step 5 of 9 wrote {mid} of 255");
 }
 
 #[test]
-fn step_one_is_the_dimmest_lit_value() {
+fn step_one_is_the_dimmest_value_the_rg34xx_lights() {
     let d = sysfs("255", "87");
     let mut p = platform(&d);
     p.set_backlight(1);
-    assert_eq!(brightness(&d), 1);
+    assert_eq!(brightness(&d), 8);
 }
 
 #[test]
@@ -77,7 +77,7 @@ fn the_steps_follow_the_curve_from_the_floor_to_full() {
             brightness(&d)
         })
         .collect();
-    assert_eq!(wrote, [0, 1, 8, 23, 47, 77, 113, 155, 202, 255]);
+    assert_eq!(wrote, [0, 8, 14, 30, 52, 81, 117, 157, 204, 255]);
 }
 
 #[test]
@@ -405,4 +405,33 @@ fn the_closest_mount_decides_not_the_root() {
 fn an_option_that_merely_mentions_ro_is_not_read_only() {
     let m = "/dev/x /mnt/card vfat rw,errors=remount-ro 0 0\n";
     assert!(!slot_power::read_only_in(m, Path::new("/mnt/card")));
+}
+
+#[test]
+fn the_kernel_log_keeps_only_card_trouble() {
+    let dmesg = "\
+[    1.561571] mmc0: host does not support reading read-only switch, assuming write-enable
+[    2.240176] [EXFAT] trying to mount...
+[    2.305657] [EXFAT] mounted successfully
+[    2.900000] Error reading temperature for gpu thermal zone: -11
+[   40.675342] FAT-fs (mmcblk0p7): Volume was not properly unmounted. Some data may be corrupt. Please run fsck.
+[  612.000001] FAT-fs (mmcblk0p7): error, invalid access to FAT (entry 0x0001a2b3)
+[  612.000002] FAT-fs (mmcblk0p7): Filesystem has been set read-only
+[  700.000000] mmcblk1: r/w command failed, status = 0x80000900
+[  700.000001] blk_update_request: I/O error, dev mmcblk1, sector 1234
+";
+    let kept = slot_power::card_kernel_lines(dmesg);
+    assert_eq!(kept.len(), 7, "{kept:#?}");
+    assert!(kept.iter().all(|l| !l.contains("read-only switch")));
+    assert!(kept.iter().all(|l| !l.contains("thermal")));
+}
+
+#[test]
+fn the_kernel_log_keeps_the_latest_card_lines() {
+    let dmesg: String = (0..100)
+        .map(|n| format!("[{n}] FAT-fs (mmcblk0p7): line {n}\n"))
+        .collect();
+    let kept = slot_power::card_kernel_lines(&dmesg);
+    assert_eq!(kept.len(), 40);
+    assert_eq!(kept.last().unwrap(), "[99] FAT-fs (mmcblk0p7): line 99");
 }

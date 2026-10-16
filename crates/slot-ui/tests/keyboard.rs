@@ -1,4 +1,4 @@
-use slot_ui::{Draw, Key, Keyboard, KeyboardFaces, TexId, HINT_H, OUT_H, OUT_W};
+use slot_ui::{Canvas, Draw, Key, Keyboard, KeyboardFaces, TexId, HINT_H, OUT_H};
 
 fn walk(moves: &str) -> Keyboard {
     let mut k = Keyboard::default();
@@ -53,26 +53,33 @@ fn leaving_a_wide_key_returns_to_the_column_you_came_from() {
     );
 }
 
+const FOUR_THREE: Canvas = Canvas {
+    w: 640.0,
+    h: OUT_H as f32,
+};
+
 #[test]
 fn the_keyboard_fits_the_screen_above_its_legend() {
     let faces = KeyboardFaces {
         legend: vec![(TexId::from_raw(1), 80)],
         ..KeyboardFaces::default()
     };
-    let mut out = Vec::new();
-    Keyboard::default().draw(&faces, 0.0, &mut out);
-    let legend_top = out
-        .iter()
-        .find_map(|d| match *d {
-            Draw::Tex { y, h, .. } if h == HINT_H as f32 => Some(y),
-            _ => None,
-        })
-        .expect("no legend drawn");
-    assert!(legend_top + HINT_H as f32 <= OUT_H as f32);
-    for d in &out[1..] {
-        if let Draw::Rect { x, y, w, h, .. } = *d {
-            assert!(x >= 0.0 && x + w <= OUT_W as f32, "a key ran off the side");
-            assert!(y + h <= legend_top, "a key ran into the legend");
+    for canvas in [Canvas::FRAMED, FOUR_THREE] {
+        let mut out = Vec::new();
+        Keyboard::default().draw(canvas, &faces, 0.0, &mut out);
+        let legend_top = out
+            .iter()
+            .find_map(|d| match *d {
+                Draw::Tex { y, h, .. } if h == HINT_H as f32 => Some(y),
+                _ => None,
+            })
+            .expect("no legend drawn");
+        assert!(legend_top + HINT_H as f32 <= OUT_H as f32);
+        for d in &out[1..] {
+            if let Draw::Rect { x, y, w, h, .. } = *d {
+                assert!(x >= 0.0 && x + w <= canvas.w, "a key ran off the side");
+                assert!(y + h <= legend_top, "a key ran into the legend");
+            }
         }
     }
 }
@@ -80,7 +87,7 @@ fn the_keyboard_fits_the_screen_above_its_legend() {
 #[test]
 fn only_the_key_under_the_cursor_is_lit() {
     let mut out = Vec::new();
-    walk("dl").draw(&KeyboardFaces::default(), 0.0, &mut out);
+    walk("dl").draw(Canvas::FRAMED, &KeyboardFaces::default(), 0.0, &mut out);
     let lit = slot_ui::edge();
     let lit: Vec<(f32, f32)> = out
         .iter()
@@ -91,7 +98,7 @@ fn only_the_key_under_the_cursor_is_lit() {
         .collect();
     assert_eq!(
         lit,
-        vec![Keyboard::key_rect(2, 9)]
+        vec![Keyboard::key_rect(Canvas::FRAMED, 2, 9)]
             .into_iter()
             .map(|(x, _, w, _)| (x, w))
             .collect::<Vec<_>>()

@@ -3,7 +3,7 @@ use slot_store::find::{fold, matches, Folded};
 use slot_store::{sort_key, Cart};
 use slot_ui::{clean_label, Key, Keyboard, SHOWN_MATCHES};
 
-use super::{go_to, leave_recent, restock, App, ShelfKind, SEARCH_AT};
+use super::{go_to, App, SEARCH_AT};
 
 const QUERY_MAX: usize = 24;
 
@@ -138,10 +138,9 @@ fn confirm(app: &mut App) {
     if app.shelf_at != SEARCH_AT {
         app.collections.search_from = app.shelf_at;
     }
-    leave_recent(app);
-    restock(app, SEARCH_AT, carts);
+    app.restock(SEARCH_AT, carts);
     app.shelves[SEARCH_AT].1.select(0);
-    app.shelves[SEARCH_AT].0 = ShelfKind::Search(format!("\"{query}\""));
+    app.mark_stars();
     app.collections.last_query = query;
     close(app);
     go_to(app, SEARCH_AT);
@@ -149,8 +148,12 @@ fn confirm(app: &mut App) {
 
 pub(super) fn clear(app: &mut App) {
     let back = app.collections.search_from;
-    go_to(app, back);
-    restock(app, SEARCH_AT, Vec::new());
-    app.shelves[SEARCH_AT].0 = ShelfKind::Search(String::new());
+    let to = Some(back)
+        .filter(|at| !app.shelves[*at].1.carts.is_empty())
+        .or_else(|| app.next_shelf(1));
+    if let Some(to) = to {
+        go_to(app, to);
+    }
+    app.restock(SEARCH_AT, Vec::new());
     app.collections.last_query.clear();
 }

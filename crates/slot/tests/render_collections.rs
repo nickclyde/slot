@@ -10,7 +10,7 @@ use slot::frontend::Frontend;
 use slot_gfx::{Compositor, HeadlessSurface, OUT_W};
 use slot_input::{Btn, InputSource, Millis, RawEvent};
 use slot_power::SimPlatform;
-use slot_ui::{edge, recess, Keyboard};
+use slot_ui::{edge, recess, Canvas, Keyboard};
 
 struct Script(VecDeque<Vec<RawEvent>>);
 
@@ -95,21 +95,21 @@ fn the_search_keyboard_draws_its_keys_with_the_one_under_the_cursor_lit() {
     while start.elapsed() < Duration::from_secs(10) {
         f.compose(&mut c);
         px = c.read_frame();
-        if ink(&px, Keyboard::key_rect(1, 0)) > 10 {
+        if ink(&px, Keyboard::key_rect(Canvas::FRAMED, 1, 0)) > 10 {
             break;
         }
         std::thread::sleep(Duration::from_millis(20));
     }
-    let (lx, ly, ..) = Keyboard::key_rect(1, 0);
+    let (lx, ly, ..) = Keyboard::key_rect(Canvas::FRAMED, 1, 0);
     assert!(near(at(&px, lx + 2.0, ly + 2.0), edge()), "Q is not lit");
-    let (ux, uy, ..) = Keyboard::key_rect(1, 1);
+    let (ux, uy, ..) = Keyboard::key_rect(Canvas::FRAMED, 1, 1);
     assert!(near(at(&px, ux + 2.0, uy + 2.0), recess()), "W is lit too");
     assert!(
-        ink(&px, Keyboard::key_rect(1, 0)) > 10,
+        ink(&px, Keyboard::key_rect(Canvas::FRAMED, 1, 0)) > 10,
         "Q has no letter on it"
     );
     assert!(
-        ink(&px, Keyboard::key_rect(3, 7)) > 10,
+        ink(&px, Keyboard::key_rect(Canvas::FRAMED, 3, 7)) > 10,
         "Space has no word on it"
     );
 
@@ -135,7 +135,7 @@ fn the_search_keyboard_draws_its_keys_with_the_one_under_the_cursor_lit() {
 }
 
 #[test]
-fn a_recently_played_shelf_draws_gba_and_game_boy_carts_side_by_side_and_names_itself() {
+fn a_list_shelf_draws_gba_and_game_boy_carts_side_by_side_and_names_itself() {
     let Ok(surface) = HeadlessSurface::new() else {
         return;
     };
@@ -144,8 +144,9 @@ fn a_recently_played_shelf_draws_gba_and_game_boy_carts_side_by_side_and_names_i
     };
     let d = tmp_root_with_carts(&["Emerald", "Fusion"]);
     std::fs::write(d.path().join("Games/GB/Tetris.gb"), vec![0u8; 0x8000]).unwrap();
+    std::fs::create_dir_all(d.path().join("Config/Lists")).unwrap();
     std::fs::write(
-        d.path().join("Config/recent.txt"),
+        d.path().join("Config/Lists/Mixed.txt"),
         "GB/Tetris\nGBA/Emerald\nGBA/Fusion\n",
     )
     .unwrap();
@@ -154,34 +155,19 @@ fn a_recently_played_shelf_draws_gba_and_game_boy_carts_side_by_side_and_names_i
     f.upload_faces(&mut c);
     let mut input = Script(VecDeque::new());
     f.advance(&mut input);
+    tap(&mut f, &mut input, Btn::L1);
     f.compose(&mut c);
     f.advance(&mut input);
     std::thread::sleep(Duration::from_millis(300));
     f.advance(&mut input);
     f.compose(&mut c);
     let px = c.read_frame();
-    dump(&px, "recent");
+    dump(&px, "list");
     let band = (
         OUT_W as f32 / 2.0 - 70.0,
         slot_gfx::OUT_H as f32 - 49.0,
         140.0,
         27.0,
     );
-    assert!(
-        faint(&px, band) > 20,
-        "the shelf did not say it was Recently Played"
-    );
-
-    let named = faint(&px, band);
-    tap(&mut f, &mut input, Btn::Y);
-    f.compose(&mut c);
-    f.advance(&mut input);
-    std::thread::sleep(Duration::from_millis(300));
-    f.advance(&mut input);
-    f.compose(&mut c);
-    let noted = c.read_frame();
-    dump(&noted, "favorited");
-    let favourited = faint(&noted, band);
-    assert!(favourited > 20, "favouriting said nothing in the slot");
-    assert_ne!(favourited, named, "the slot still says Recently Played");
+    assert!(faint(&px, band) > 20, "the shelf did not say it was Mixed");
 }

@@ -1,4 +1,4 @@
-use crate::draw::{Draw, TexId, OUT_H, OUT_W};
+use crate::draw::{Canvas, Draw, TexId, OUT_H};
 use crate::plate::{centred_hints, hint_face, title_face, word_face, UndoFace, HINT_H, LEGEND_GAP};
 use crate::power_menu::menu_face;
 use crate::slot_chrome::{edge, opening, recess};
@@ -12,10 +12,10 @@ pub enum Key {
 }
 
 pub const COLS: usize = 10;
-pub const KEY_W: f32 = 60.0;
+pub const KEY_W: f32 = 56.0;
 pub const KEY_H: f32 = 44.0;
 pub const KEY_GAP: f32 = 6.0;
-pub const KEYS_X: f32 = (OUT_W as f32 - (COLS as f32 * (KEY_W + KEY_GAP) - KEY_GAP)) / 2.0;
+const KEYS_W: f32 = COLS as f32 * (KEY_W + KEY_GAP) - KEY_GAP;
 pub const KEYS_Y: f32 = 204.0;
 pub const FIELD_Y: f32 = 26.0;
 pub const FIELD_H: f32 = 48.0;
@@ -121,11 +121,11 @@ impl Keyboard {
         self.home = self.col;
     }
 
-    pub fn key_rect(row: usize, col: usize) -> (f32, f32, f32, f32) {
+    pub fn key_rect(canvas: Canvas, row: usize, col: usize) -> (f32, f32, f32, f32) {
         let (start, end) = span(row, col);
         let wide = (end - start + 1) as f32;
         (
-            KEYS_X + start as f32 * (KEY_W + KEY_GAP),
+            canvas.centred(KEYS_W).round() + start as f32 * (KEY_W + KEY_GAP),
             KEYS_Y + row as f32 * (KEY_H + KEY_GAP),
             wide * KEY_W + (wide - 1.0) * KEY_GAP,
             KEY_H,
@@ -170,16 +170,16 @@ pub struct KeyboardFaces {
 }
 
 impl Keyboard {
-    pub fn draw(&self, faces: &KeyboardFaces, shake: f32, out: &mut Vec<Draw>) {
+    pub fn draw(&self, canvas: Canvas, faces: &KeyboardFaces, shake: f32, out: &mut Vec<Draw>) {
         out.push(Draw::Rect {
             x: 0.0,
             y: 0.0,
-            w: OUT_W as f32,
+            w: canvas.w,
             h: OUT_H as f32,
             colour: opening(),
         });
         out.push(Draw::Rect {
-            x: ((OUT_W as f32 - FIELD_W) / 2.0 + shake).round(),
+            x: (canvas.centred(FIELD_W) + shake).round(),
             y: FIELD_Y,
             w: FIELD_W,
             h: FIELD_H,
@@ -187,35 +187,21 @@ impl Keyboard {
         });
         if let Some((tex, w, h)) = faces.query {
             let y = FIELD_Y + (FIELD_H - h as f32) / 2.0;
-            push(
-                out,
-                tex,
-                (OUT_W as f32 - w as f32) / 2.0 + shake,
-                y,
-                w as f32,
-                h,
-            );
+            push(out, tex, canvas.centred(w as f32) + shake, y, w as f32, h);
         }
         if let Some((tex, w, h)) = faces.count {
-            push(
-                out,
-                tex,
-                (OUT_W as f32 - w as f32) / 2.0,
-                COUNT_Y,
-                w as f32,
-                h,
-            );
+            push(out, tex, canvas.centred(w as f32), COUNT_Y, w as f32, h);
         }
         for (i, &(tex, w, h)) in faces.matches.iter().take(SHOWN_MATCHES).enumerate() {
             let y = MATCH_Y + i as f32 * MATCH_PITCH;
-            push(out, tex, (OUT_W as f32 - w as f32) / 2.0, y, w as f32, h);
+            push(out, tex, canvas.centred(w as f32), y, w as f32, h);
         }
         let lit = self.at();
         let keys = all_keys();
         for row in 0..ROWS.len() {
             let mut col = 0;
             while col < COLS {
-                let (x, y, w, h) = Keyboard::key_rect(row, col);
+                let (x, y, w, h) = Keyboard::key_rect(canvas, row, col);
                 let colour = if (row, col) == lit { edge() } else { recess() };
                 out.push(Draw::Rect { x, y, w, h, colour });
                 let key = key_at(row, col);
@@ -237,7 +223,7 @@ impl Keyboard {
                 col = span(row, col).1 + 1;
             }
         }
-        for (tex, w, x) in centred_hints(&faces.legend, LEGEND_GAP) {
+        for (tex, w, x) in centred_hints(canvas, &faces.legend, LEGEND_GAP) {
             push(out, tex, x, KEYBOARD_LEGEND_Y, w as f32, HINT_H);
         }
     }

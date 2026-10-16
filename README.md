@@ -16,7 +16,7 @@
 
 This is [slot-plus](https://github.com/nickclyde/slot-plus), an unofficial fork of
 [BrandonKowalski/slot](https://github.com/BrandonKowalski/slot) that adds
-**[RetroAchievements](https://retroachievements.org)**, a home **Wi-Fi** client, and shelves and search for
+**[RetroAchievements](https://retroachievements.org)**, a home **Wi-Fi** client, list shelves and search for
 big libraries. Everything else is upstream slot, and the fork is kept in sync with it. Please report bugs in
 these additions here rather than to slot.
 
@@ -29,7 +29,6 @@ What it adds:
   you are back online.
 - Softcore only, so resume-on-insert, rewind and Polaroids keep working as usual.
 - Joins your home network from `Config/wifi.txt`, and steps aside while link play uses the radio.
-- Recently Played and Favorites shelves before the platforms on L1/R1. Y adds or removes a favorite.
 - Your own shelves: each `.txt` file in `Config/Lists/` is a shelf, one game per line.
 - X searches every platform from an on-screen keyboard and puts the matches on a shelf of their own.
 
@@ -107,10 +106,7 @@ Release notes can be found in the [changelog](CHANGELOG.md).
 | Anbernic RG35XXSP  | Yes                        | 1.5.0         |
 | Anbernic 35XX Plus | Yes                        | 1.5.0         |
 | Anbernic RG28XX    | Yes                        | 1.6.0         |
-
-RG28XX support was contributed by [GamerAnim](https://github.com/GamerAnim). Its panel is mounted
-portrait, so slot turns the picture onto it. If it comes out upside down, add `export SLOT_ROTATE=ccw`
-to `System/launch_frontend.sh`.
+| Anbernic RG35XX-H  | Yes                        | 1.7.0         |
 
 If you have one of the untested devices, or have tried slot on a device not listed,
 please [open an issue on GitHub](https://github.com/BrandonKowalski/slot/issues) and let me know how it went.
@@ -119,12 +115,18 @@ please [open an issue on GitHub](https://github.com/BrandonKowalski/slot/issues)
 
 # AI Disclosure
 
-The Rust frontend was put together by Claude Opus. I reviewed everything that was
-produced. All documentation is 100% free-range, meatbag prose.
+The Rust frontend, and the SVGs on [slot-cfw.fyi](https://slot-cfw.fyi), were put together by Claude.
+I reviewed everything that was produced. All documentation is 100% free-range, meatbag prose.
 
-The project is extremely low stakes. I wanted a bespoke frontend for my RG SP and thought
-that something that evokes the feeling of using my GBA SP as a kid would be pretty neat.
+My goal with this project was to recreate the feeling of playing my GBA SP in the back seat as a kid,
+but with a few modern creature comforts.
 
-Use it, don't use it, I don't care.
+Nothing about this project is exciting or groundbreaking from a technological perspective, and as a
+result, I delegated the glue code. mGBA and gpSP have been around forever and are the true stars of
+this show. The incredible skeuomorphic art is the work of [Markus](https://github.com/MarkusMaribu), an
+artist who saw the bare-bones version and offered to dress it up.
+
+I understand if my use of AI is a dealbreaker for you. Just know it's the least interesting part of
+what's here.
 
 Figured I should share the end result of all the wasted water. ✌🏻

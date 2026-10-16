@@ -1,19 +1,21 @@
 mod common;
 
-use slot::app::shelves::ShelfKind;
 use slot::app::{App, Phase};
 use slot_input::{Action, Btn};
-use slot_store::Platform;
 use slot_ui::Key;
 use tempfile::TempDir;
 
+const GBA: &str = "Game Boy Advance";
+
 fn card() -> TempDir {
-    common::tmp_root_with_carts(&[
+    let d = common::tmp_root_with_carts(&[
         "Metroid Fusion",
         "Pokemon - Emerald Version (USA, Europe)",
         "Pokemon - Ruby Version",
         "Golden Sun",
-    ])
+    ]);
+    common::write_gb_cart(&d, "Tetris", "TETRIS");
+    d
 }
 
 fn press(a: &mut App, btn: Btn) {
@@ -83,7 +85,7 @@ fn b_deletes_a_letter_and_closes_the_keyboard_once_it_is_empty() {
     assert_eq!(a.search().unwrap().query, "");
     press(&mut a, Btn::B);
     assert!(a.search().is_none());
-    assert_eq!(a.shelf_kind(), &ShelfKind::Platform(Platform::Gba));
+    assert_eq!(a.shelf_platform_name(), Some(GBA));
 }
 
 #[test]
@@ -94,8 +96,8 @@ fn start_puts_the_matches_on_a_search_shelf_and_moves_there() {
     type_in(&mut a, "VERSION");
     press(&mut a, Btn::Start);
     assert!(a.search().is_none());
-    assert_eq!(a.shelf_kind(), &ShelfKind::Search("\"VERSION\"".into()));
-    assert_eq!(a.shelf_platform_name(), Some("\"VERSION\""));
+    assert_eq!(a.shelf_platform_name(), Some("Search"));
+    assert_eq!(a.slot_text().as_deref(), Some("\"VERSION\""));
     assert_eq!(
         a.shelf_stems(),
         [
@@ -134,7 +136,7 @@ fn a_search_with_no_matches_shakes_and_stays_open() {
     press(&mut a, Btn::Start);
     assert!(a.search().is_some(), "an empty search closed the keyboard");
     assert!(a.refusal_active(a.now()));
-    assert_eq!(a.shelf_kind(), &ShelfKind::Platform(Platform::Gba));
+    assert_eq!(a.shelf_platform_name(), Some(GBA));
 }
 
 #[test]
@@ -147,7 +149,7 @@ fn the_keyboard_keeps_menu_start_and_the_shoulders_to_itself() {
     assert_eq!(a.search().unwrap().query, "A", "L1 did not delete");
     press(&mut a, Btn::R1);
     assert_eq!(a.search().unwrap().query, "A ", "R1 did not space");
-    assert_eq!(a.shelf_kind(), &ShelfKind::Platform(Platform::Gba));
+    assert_eq!(a.shelf_platform_name(), Some(GBA));
     a.apply(Action::QuickMenu);
     assert!(
         matches!(a.phase(), Phase::Shelf),
@@ -165,12 +167,10 @@ fn b_on_the_search_shelf_clears_it_and_goes_back() {
     type_in(&mut a, "POK");
     press(&mut a, Btn::Start);
     press(&mut a, Btn::B);
-    assert_eq!(a.shelf_kind(), &ShelfKind::Platform(Platform::Gba));
+    assert_eq!(a.shelf_platform_name(), Some(GBA));
     assert_eq!(a.selected_stem(), Some("Metroid Fusion"));
     assert!(
-        !a.shelf_kinds()
-            .iter()
-            .any(|k| matches!(k, ShelfKind::Search(_))),
+        !a.shelf_names().iter().any(|n| n.starts_with('"')),
         "the cleared search stayed on the ring"
     );
 }
@@ -189,8 +189,8 @@ fn x_on_the_search_shelf_edits_the_last_search() {
     assert_eq!(a.shelf_stems(), ["Pokemon - Ruby Version"]);
     press(&mut a, Btn::B);
     assert_eq!(
-        a.shelf_kind(),
-        &ShelfKind::Platform(Platform::Gba),
+        a.shelf_platform_name(),
+        Some(GBA),
         "a second search forgot where the first one started"
     );
 }
@@ -203,7 +203,7 @@ fn the_search_shelf_stays_on_the_ring_until_it_is_cleared() {
     type_in(&mut a, "POK");
     press(&mut a, Btn::Start);
     press(&mut a, Btn::R1);
-    assert_eq!(a.shelf_kind(), &ShelfKind::Platform(Platform::Gba));
+    assert_eq!(a.shelf_platform_name(), Some(GBA));
     press(&mut a, Btn::L1);
-    assert_eq!(a.shelf_kind(), &ShelfKind::Search("\"POK\"".into()));
+    assert_eq!(a.slot_text().as_deref(), Some("\"POK\""));
 }

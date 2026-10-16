@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use slot::audio::{AudioSink, StubSink, GBA_HZ};
+use slot::audio::{AudioSink, StubSink, OUTPUT_HZ};
 use slot::emu::{EmuHandle, Speed};
 use slot_retro::MockCore;
 
@@ -86,7 +86,7 @@ fn signs_in_remembers_the_token_and_identifies_the_inserted_cart() {
     assert!(seen.lock().unwrap()[0].contains("p=hunter2"));
 
     let mut sink = StubSink::new();
-    sink.open(GBA_HZ).unwrap();
+    sink.open(OUTPUT_HZ).unwrap();
     let emu = EmuHandle::spawn(Box::new(MockCore::new()), rom, sink.ring(), None, None);
     emu.set_speed(Speed::Normal);
 

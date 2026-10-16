@@ -1,13 +1,12 @@
 # Handoff: RetroAchievements fork
 
 Notes for whoever picks this fork up next. `FORK.md` lists every hook in upstream files and how to sync;
-this file covers status, decisions and what is still open. Last updated 2026-10-13.
+this file covers status, decisions and what is still open. Last updated 2026-10-16.
 
 ## Status
 
 - RetroAchievements (softcore) and the Wi-Fi client are implemented, tested and committed on `main` of
-  `nickclyde/slot-plus`, based on upstream `4a4ba92` (v1.6.0 plus run-ahead, "Add a 1 frame run-ahead setting
-  for GBA games on mGBA").
+  `nickclyde/slot-plus`, synced with upstream `e5b12ad` (v1.7.0 plus "Add RG35XX-H to the device list").
 - Confirmed on a real RG SP: sign-in worked for user `clydedroid`, and inserting Metroid - Zero Mission showed
   the game-loaded banner with 2 achievements. Not yet checked from `slot.log` whether Wi-Fi came up through
   `slotnet.sh` or BaseOS was already online.
@@ -74,9 +73,10 @@ this file covers status, decisions and what is still open. Last updated 2026-10-
 - **`SET_MEMORY_MAPS` is `36 | 0x10000`** (the experimental flag). Both values are accepted.
 - **`a_stalled_display_does_not_stall_the_worker`** in `crates/slot/tests/emu.rs` is timing sensitive. It fails
   on untouched upstream too when the Mac is busy; rerun it on a quiet machine before suspecting a change.
-- **Upstream fails `task check` on its own (v1.6.0 through `4a4ba92`).** `crates/slot/tests/prefetch.rs` is
-  not rustfmt-clean and has an unused `let mut step`, so `fmt:check` and `lint` fail. Leave it for upstream to
-  fix rather than editing the file and creating merge conflicts; run `lint:device`, `test` and `test:card` on their own.
+- **`task test` needs `cargo-nextest`** since upstream v1.7.0. Without it, `cargo test --workspace` runs the
+  same tests. On the Mac used for the 2026-10-16 sync, `a_framed_frame_on_a_4_by_3_panel_is_todays_frame` and
+  `a_framed_frame_after_a_native_one_is_todays_frame_again` in `crates/slot-gfx/tests/layout.rs` fail on
+  untouched upstream too: they compare exact pixel hashes, which this GPU renders differently.
 - **Do not share `target/` between this checkout and a worktree of upstream.** Cargo names workspace crate
   artifacts relative to the workspace root, so one build overwrites the other's and stale artifacts look
   fresh. `cargo clean -p <crate>` for each workspace crate fixes it.
@@ -107,30 +107,34 @@ itself, or the shell will keep an old partition size.
 Moving a save from RetroArch: copy the `.srm` to `Saves/GBA/<ROM name>.sav`. It is the same raw save memory.
 Save states from other frontends do not carry over.
 
-## Shelves and search
+## Lists and search
 
 Added 2026-10-13 for libraries of 1000+ carts. Code and hooks are listed in `FORK.md`.
 
-- **Ring order** is `[Search, Recently Played, Favorites, lists A to Z, GBA, GB, GBC]`, all built once at boot,
-  because `CartFaces` keys faces by `(shelf, index)`. Empty shelves are skipped by `next_shelf` like an
-  empty platform. The Search shelf is empty until a search is confirmed.
-- **Boot** lands on Recently Played when it has a cart, else on the platform shelf as before. A seated cart
-  still resumes on its platform shelf (`seat_of` ignores collections).
-- **Files**: `Config/recent.txt` (newest first, 30 max), `Config/favorites.txt` and `Config/Lists/*.txt`.
-  Lines are matched leniently (`GBA/Stem`, a bare stem, a rom file name, or a stem without its tags when only
-  one cart fits). Lines matching nothing are kept when slot rewrites a file. Lists are read-only and read at
-  boot. Writes go through a `slot-lists` thread.
-- **Recently Played does not reorder while you are on it**, so the cart you just ejected stays under the
-  slot. It catches up when you leave it.
+- **Recents and Favorites are upstream's.** The fork had its own Recently Played and Favorites shelves, but
+  upstream v1.7.0 shipped both (Recents is off by default, under General). The 2026-10-16 sync dropped the
+  fork's versions to keep the diff small. The fork's old `Config/recent.txt` is no longer read; upstream keeps
+  `Config/recents.txt`. `Config/favorites.txt` is the same file and format in both.
+- **Ring order** is `[Recents, Favorites, Search, lists A to Z, GBA, GB, GBC]`, all built once at boot,
+  because `CartFaces` keys faces by `(shelf, index)`. Upstream addresses Recents and Favorites by fixed index,
+  so the fork splices its shelves in after them. Empty shelves are skipped by `next_shelf`. The Search shelf
+  is empty until a search is confirmed.
+- **List names are leaked** (`Box::leak`) into `Rack::List(&'static str)` once per boot, so `Rack` stays
+  `Copy` and upstream's `name`/`key` keep their signatures. Upstream remembers the shelf at power-off by
+  `key`, which for a list is `list/<name>`.
+- **Lists** are `Config/Lists/*.txt`, read once at boot. Lines are matched leniently (`GBA/Stem`, a bare stem,
+  a rom file name, or a stem without its tags when only one cart fits).
 - **Search** matches folded stems: title prefix first, then word starts, then substrings of 3+ letters.
-  The keyboard swallows every button while open. Hold-to-repeat on the d-pad is not done.
+  The keyboard swallows every button while open. Upstream's held-direction repeat now repeats Up and Down
+  on it; Left and Right do not repeat. The shelf name shows the quoted query through `search_title`.
+- **The keyboard follows upstream's `Canvas`**, so it stays inside the 640-wide native layout on 4:3 panels.
+  Keys are 56 px wide to fit.
 - **Not tested directly**: the `cart_faces.rs` stale-face guard has no test that forces the race.
 
 Still to check on the device:
 
-1. The keyboard is readable at real size, and the d-pad feels right without hold-to-repeat.
-2. A mixed GBA/GB shelf looks right on the RG35XXSP's 4:3 screen.
-3. With 1000+ carts, opening the keyboard and each keypress do not stutter.
+1. The keyboard is readable at real size on both the RG SP and the RG35XXSP's 4:3 screen.
+2. With 1000+ carts, opening the keyboard and each keypress do not stutter.
 
 ## Ideas not done
 

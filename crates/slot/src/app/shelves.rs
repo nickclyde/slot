@@ -1,70 +1,24 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::mpsc::{self, Receiver};
 
 use slot_gfx::Compositor;
 use slot_input::{Action, Btn};
-use slot_store::collections::{
-    hits, read_entries, read_lists, render, toggle, CartKey, Entry, Index, FAVORITES_FILE,
-    LISTS_DIR, RECENT_FILE,
-};
-use slot_store::{sort_key, Cart, Platform};
+use slot_store::collections::{read_lists, CartKey, Index, LISTS_DIR};
+use slot_store::{Cart, Platform};
 use slot_ui::{Draw, KeyboardFaces, Shelf, TexId, UndoFace};
 
-use super::{App, Phase};
+use super::{App, Phase, Rack, FAVORITES_AT};
 
 mod search;
-mod writer;
 
 pub use search::Search;
-use writer::ListWriter;
 
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum ShelfKind {
-    Platform(Platform),
-    Recent,
-    Favorites,
-    List(String),
-    Search(String),
-}
-
-impl ShelfKind {
-    pub fn platform(&self) -> Option<Platform> {
-        match self {
-            ShelfKind::Platform(p) => Some(*p),
-            _ => None,
-        }
-    }
-
-    pub fn name(&self) -> &str {
-        match self {
-            ShelfKind::Platform(p) => p.name(),
-            ShelfKind::Recent => "Recently Played",
-            ShelfKind::Favorites => "Favorites",
-            ShelfKind::List(name) | ShelfKind::Search(name) => name,
-        }
-    }
-}
-
-impl From<Platform> for ShelfKind {
-    fn from(p: Platform) -> Self {
-        ShelfKind::Platform(p)
-    }
-}
-
-const SEARCH_AT: usize = 0;
-const RECENT_AT: usize = 1;
-const FAVORITES_AT: usize = 2;
+const SEARCH_AT: usize = FAVORITES_AT + 1;
 
 #[derive(Default)]
 pub struct Collections {
-    root: Option<PathBuf>,
-    recent: Vec<Entry>,
-    favorites: Vec<Entry>,
-    recent_dirty: bool,
-    note: Option<&'static str>,
-    shed: Vec<TexId>,
-    writer: Option<ListWriter>,
+    stocked: bool,
     search: Option<Search>,
     search_from: usize,
     last_query: String,
@@ -77,36 +31,17 @@ pub struct Collections {
 pub fn stock(app: &mut App, root: &Path) {
     let _ = std::fs::create_dir_all(root.join(LISTS_DIR));
     let index = Index::new(app.carts());
-    let recent = read_entries(&root.join(RECENT_FILE), &index);
-    let favorites = read_entries(&root.join(FAVORITES_FILE), &index);
-    let mut front = vec![
-        (ShelfKind::Search(String::new()), Shelf::new(Vec::new())),
-        (
-            ShelfKind::Recent,
-            Shelf::new(carts_for(app, &hits(&recent))),
-        ),
-        (
-            ShelfKind::Favorites,
-            Shelf::new(favourite_carts(app, &favorites)),
-        ),
-    ];
+    let mut racks = vec![(Rack::Search, Shelf::new(Vec::new()))];
     for list in read_lists(root, &index) {
-        let carts = carts_for(app, &list.carts);
-        front.push((ShelfKind::List(list.name), Shelf::new(carts)));
+        let name: &'static str = Box::leak(list.name.into_boxed_str());
+        racks.push((Rack::List(name), Shelf::new(carts_for(app, &list.carts))));
     }
-    let added = front.len();
-    app.shelves.splice(0..0, front);
-    app.shelf_at = match app.shelves[RECENT_AT].1.carts.is_empty() {
-        true => app.shelf_at + added,
-        false => RECENT_AT,
-    };
-    app.collections = Collections {
-        root: Some(root.to_path_buf()),
-        recent,
-        favorites,
-        writer: Some(ListWriter::spawn(app.card_failing.clone())),
-        ..Collections::default()
-    };
+    let added = racks.len();
+    app.shelves.splice(SEARCH_AT..SEARCH_AT, racks);
+    if app.shelf_at >= SEARCH_AT {
+        app.shelf_at += added;
+    }
+    app.collections.stocked = true;
 }
 
 fn carts_for(app: &App, keys: &[CartKey]) -> Vec<Cart> {
@@ -120,43 +55,7 @@ fn carts_for(app: &App, keys: &[CartKey]) -> Vec<Cart> {
         .collect()
 }
 
-fn favourite_carts(app: &App, favorites: &[Entry]) -> Vec<Cart> {
-    let mut carts = carts_for(app, &hits(favorites));
-    carts.sort_by(|a, b| {
-        (sort_key(&a.stem), a.platform as u8).cmp(&(sort_key(&b.stem), b.platform as u8))
-    });
-    carts
-}
-
-fn stocked(app: &App) -> bool {
-    app.collections.root.is_some()
-}
-
-fn save(app: &App, file: &str, entries: &[Entry]) {
-    let (Some(root), Some(writer)) = (&app.collections.root, &app.collections.writer) else {
-        return;
-    };
-    writer.save(root.join(file), render(entries));
-}
-
-fn restock(app: &mut App, at: usize, carts: Vec<Cart>) {
-    let shelf = &mut app.shelves[at].1;
-    let keep = shelf.carts.get(shelf.index).map(|c| c.rom.clone());
-    let spare = shelf.restock(carts, keep.as_deref());
-    app.collections.shed.extend(spare);
-}
-
-fn restock_recent(app: &mut App) {
-    let carts = carts_for(app, &hits(&app.collections.recent));
-    restock(app, RECENT_AT, carts);
-    app.shelves[RECENT_AT].1.select(0);
-    app.collections.recent_dirty = false;
-}
-
 fn go_to(app: &mut App, to: usize) {
-    if to == app.shelf_at {
-        return;
-    }
     app.shelf_mut().release_hold();
     app.play_held = None;
     app.shelf_at = to;
@@ -166,90 +65,30 @@ fn go_to(app: &mut App, to: usize) {
     app.name_pending = true;
 }
 
-fn leave_recent(app: &mut App) {
-    if app.shelf_at == RECENT_AT && app.collections.recent_dirty {
-        restock_recent(app);
-    }
-}
-
 pub fn input(app: &mut App, action: Action) -> bool {
-    if !stocked(app) || !matches!(app.phase, Phase::Shelf) || app.core_picker.is_some() {
+    let c = &app.collections;
+    if !c.stocked || !matches!(app.phase, Phase::Shelf) || app.core_picker.is_some() {
         return false;
     }
-    if app.collections.search.is_some() {
+    if c.search.is_some() {
         search::input(app, action);
         return true;
     }
     match action {
-        Action::GbaDown(Btn::Y) => favourite(app),
         Action::GbaDown(Btn::X) => search::open(app),
         Action::GbaDown(Btn::B) if app.shelf_at == SEARCH_AT => search::clear(app),
-        Action::GbaDown(btn @ (Btn::L1 | Btn::R1)) => {
-            app.collections.note = None;
-            let by = if btn == Btn::L1 { -1 } else { 1 };
-            if app.next_shelf(by).is_some() {
-                leave_recent(app);
-            }
-            return false;
-        }
-        Action::GbaDown(Btn::Up | Btn::Down) => {
-            app.collections.note = None;
-            return false;
-        }
         _ => return false,
     }
     true
 }
 
-fn favourite(app: &mut App) {
-    let Some(cart) = app.shelf().carts.get(app.shelf().index).cloned() else {
-        return;
-    };
-    let now = toggle(&mut app.collections.favorites, cart.platform, &cart.stem);
-    save(app, FAVORITES_FILE, &app.collections.favorites);
-    let carts = favourite_carts(app, &app.collections.favorites);
-    restock(app, FAVORITES_AT, carts);
-    if app.shelf_at == FAVORITES_AT && app.shelf().carts.is_empty() {
-        if let Some(to) = app.next_shelf(1) {
-            go_to(app, to);
-        }
-    }
-    note(app, if now { "Favorited" } else { "Unfavorited" });
+pub fn search_title(app: &App) -> Option<String> {
+    let on_search = app.shelves[app.shelf_at].0 == Rack::Search;
+    (on_search && app.slot_letter.is_none()).then(|| quoted(&app.collections.last_query))
 }
 
-fn note(app: &mut App, text: &'static str) {
-    if app.slot_text().as_deref() != Some(text) {
-        app.shelf_platform = slot_ui::Printed::default();
-    }
-    app.collections.note = Some(text);
-    app.shelf_named = None;
-    app.name_pending = true;
-}
-
-pub fn shown_note(app: &App) -> Option<&'static str> {
-    app.collections.note
-}
-
-pub fn recorded(app: &mut App, cart: Option<&str>) {
-    if !stocked(app) || cart.is_none() {
-        return;
-    }
-    let Some(seated) = app.seated_cart() else {
-        return;
-    };
-    let (platform, stem) = (seated.platform, seated.stem.clone());
-    if !slot_store::collections::played(&mut app.collections.recent, platform, &stem) {
-        return;
-    }
-    save(app, RECENT_FILE, &app.collections.recent);
-    match app.shelf_at == RECENT_AT {
-        true => app.collections.recent_dirty = true,
-        false => restock_recent(app),
-    }
-}
-
-pub fn take_shed(app: &mut App) -> Vec<TexId> {
-    std::mem::take(&mut app.collections.shed)
+fn quoted(query: &str) -> String {
+    format!("\"{query}\"")
 }
 
 pub fn draw(app: &App, out: &mut Vec<Draw>) {
@@ -258,13 +97,15 @@ pub fn draw(app: &App, out: &mut Vec<Draw>) {
     }
     if let Some(search) = &app.collections.search {
         let shake = app.shake_when(true, app.now());
-        search.keyboard.draw(&app.collections.faces, shake, out);
+        search
+            .keyboard
+            .draw(app.canvas(), &app.collections.faces, shake, out);
     }
 }
 
 pub fn sync_faces(app: &mut App, compositor: &mut Compositor) {
     let c = &mut app.collections;
-    if c.root.is_none() {
+    if !c.stocked {
         return;
     }
     if c.faces.keys.is_empty() {
@@ -331,21 +172,14 @@ fn put(compositor: &mut Compositor, slot: Option<TexId>, face: UndoFace) -> (Tex
 }
 
 impl App {
-    pub fn flush_lists(&self) {
-        if let Some(writer) = &self.collections.writer {
-            writer.flush();
-        }
-    }
-
-    pub fn shelf_kind(&self) -> &ShelfKind {
-        &self.shelves[self.shelf_at].0
-    }
-
-    pub fn shelf_kinds(&self) -> Vec<ShelfKind> {
+    pub fn shelf_names(&self) -> Vec<String> {
         self.shelves
             .iter()
             .filter(|(_, s)| !s.carts.is_empty())
-            .map(|(k, _)| k.clone())
+            .map(|(rack, _)| match rack {
+                Rack::Search => quoted(&self.collections.last_query),
+                _ => rack.name().to_string(),
+            })
             .collect()
     }
 

@@ -5,10 +5,7 @@ use crate::find::fold;
 use crate::platform::Platform;
 use crate::scan::{is_hidden, sort_key, Cart};
 
-pub const RECENT_FILE: &str = "Config/recent.txt";
-pub const FAVORITES_FILE: &str = "Config/favorites.txt";
 pub const LISTS_DIR: &str = "Config/Lists";
-pub const RECENT_MAX: usize = 30;
 
 pub type CartKey = (Platform, String);
 
@@ -95,23 +92,10 @@ fn loose(name: &str) -> String {
     fold(name).joined
 }
 
-pub fn canonical(platform: Platform, stem: &str) -> String {
-    format!("{}/{stem}", platform.dir_name())
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Entry {
     pub raw: String,
     pub hit: Option<CartKey>,
-}
-
-impl Entry {
-    fn of(key: CartKey) -> Self {
-        Entry {
-            raw: canonical(key.0, &key.1),
-            hit: Some(key),
-        }
-    }
 }
 
 pub fn parse_entries(text: &str, index: &Index) -> Vec<Entry> {
@@ -132,17 +116,6 @@ pub fn read_entries(path: &Path, index: &Index) -> Vec<Entry> {
     }
 }
 
-pub fn render(entries: &[Entry]) -> String {
-    entries
-        .iter()
-        .map(|e| match &e.hit {
-            Some((platform, stem)) => canonical(*platform, stem),
-            None => e.raw.clone(),
-        })
-        .map(|line| line + "\n")
-        .collect()
-}
-
 pub fn hits(entries: &[Entry]) -> Vec<CartKey> {
     let mut out: Vec<CartKey> = Vec::new();
     for key in entries.iter().filter_map(|e| e.hit.as_ref()) {
@@ -151,40 +124,6 @@ pub fn hits(entries: &[Entry]) -> Vec<CartKey> {
         }
     }
     out
-}
-
-pub fn played(entries: &mut Vec<Entry>, platform: Platform, stem: &str) -> bool {
-    let key = (platform, stem.to_string());
-    let mut next = vec![Entry::of(key.clone())];
-    next.extend(
-        entries
-            .iter()
-            .filter(|e| e.hit.as_ref() != Some(&key))
-            .cloned(),
-    );
-    next.truncate(RECENT_MAX);
-    let changed = render(&next) != render(entries);
-    *entries = next;
-    changed
-}
-
-pub fn toggle(entries: &mut Vec<Entry>, platform: Platform, stem: &str) -> bool {
-    let key = (platform, stem.to_string());
-    let before = entries.len();
-    entries.retain(|e| e.hit.as_ref() != Some(&key));
-    if entries.len() != before {
-        return false;
-    }
-    entries.push(Entry::of(key));
-    true
-}
-
-pub fn is_listed(entries: &[Entry], platform: Platform, stem: &str) -> bool {
-    entries.iter().any(|e| {
-        e.hit
-            .as_ref()
-            .is_some_and(|(p, s)| *p == platform && s == stem)
-    })
 }
 
 pub struct List {
