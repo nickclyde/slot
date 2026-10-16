@@ -61,7 +61,7 @@ username = YourName
 password = your password
 ```
 
-Boot, insert a cart, and play. If something does not work, `slot.log` at the root of the card has
+Boot, insert a cart, and play. If something does not work, `Logs/slot.log` on the card has
 `slot: wifi:` and `slot: cheevos:` lines explaining why. More detail, including static IP settings, is in
 [site/retroachievements.html](site/retroachievements.html). How the fork is put together and how to sync
 it with upstream is in [FORK.md](FORK.md).
